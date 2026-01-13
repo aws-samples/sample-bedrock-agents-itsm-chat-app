@@ -15,7 +15,7 @@ The AgentCore implementation provides:
 
 ## Architecture
 
-![Architecture Diagram](../docs/bedrock-agentscore-lab.png)
+![Architecture Diagram](../../docs/bedrock-agentcore-lab.png)
 
 
 ## Prerequisites
