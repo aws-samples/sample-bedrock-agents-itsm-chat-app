@@ -11,6 +11,10 @@ Before deploying the Bedrock Agents implementation, ensure you have the followin
 * **Docker** - [Install Docker community edition](https://hub.docker.com/search/?type=edition&offering=community)
 * **AWS CLI** - [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and configure with appropriate credentials
 
+## Architecture
+
+![Architecture Diagram](docs/bedrock-agents-itsm.png)
+
 ## Deployment Process
 
 The deployment process consists of four main steps:

@@ -12,6 +12,8 @@ This solution offers two distinct Amazon Bedrock implementations, each designed 
 
 **Best for**: Rapid prototyping and proof-of-concept development
 
+![Architecture Diagram](docs/bedrock-agents-itsm.png)
+
 **Key Characteristics**:
 - **Deployment Model**: Fully managed AWS service with configuration-based setup
 - **Infrastructure**: AWS handles all agent runtime infrastructure automatically
@@ -32,6 +34,8 @@ This solution offers two distinct Amazon Bedrock implementations, each designed 
 ### 2. Bedrock AgentCore (Production-Ready) - `src/bedrock-agentcore/`
 
 **Best for**: Production deployments requiring enterprise-grade customization and control
+
+![Architecture Diagram](docs/bedrock-agentcore-lab.png)
 
 **Key Characteristics**:
 - **Deployment Model**: Container-based runtime with full code control
@@ -57,8 +61,6 @@ This solution offers two distinct Amazon Bedrock implementations, each designed 
 - Organizations requiring specialized agent behaviors
 - Compliance and security-sensitive environments
 - High-scale deployments with custom performance requirements
-
-![Architecture Diagram](docs/bedrock-agents-itsm.png)
 
 This project includes the following files and folders:
 

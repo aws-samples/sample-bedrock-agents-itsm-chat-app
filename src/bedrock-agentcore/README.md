@@ -15,28 +15,8 @@ The AgentCore implementation provides:
 
 ## Architecture
 
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Chat Frontend │───▶│  API Gateway     │───▶│ AgentCore       │
-│   (Same as      │    │  (Shared)        │    │ Runtime         │
-│   Agents impl)  │    │                  │    │ (Container)     │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │                        │
-                                ▼                        ▼
-                       ┌──────────────────┐    ┌─────────────────┐
-                       │ Lambda Functions │    │ Strands Agent   │
-                       │ (create/lookup)  │    │ - CreateTool    │
-                       │                  │    │ - LookupTool    │
-                       └──────────────────┘    │ - KnowledgeTool │
-                                │              └─────────────────┘
-                                ▼
-                       ┌──────────────────┐
-                       │ Shared Resources │
-                       │ - DynamoDB       │
-                       │ - S3 Bucket      │
-                       │ - OpenSearch     │
-                       └──────────────────┘
-```
+![Architecture Diagram](docs/bedrock-agentscore-lab.png)
+
 
 ## Prerequisites
 
