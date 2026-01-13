@@ -8,7 +8,7 @@ This solution provides a web-based chat interface for interacting with Amazon Be
 
 This solution offers two distinct Amazon Bedrock implementations, each designed for different use cases and technical requirements. Both provide identical functionality to end users through the same chat interface, but offer different deployment models and levels of customization.
 
-### 1. Bedrock Agents (Prototype-Focused) - `src/bedrock-agent-itsm/`
+### 1. Bedrock Agents (Prototype-Focused) - `src/bedrock-agents-itsm/`
 
 **Best for**: Rapid prototyping and proof-of-concept development
 
@@ -31,7 +31,7 @@ This solution offers two distinct Amazon Bedrock implementations, each designed 
 - Educational workshops and training
 - Teams preferring configuration over custom code
 
-### 2. Bedrock AgentCore (Production-Ready) - `src/bedrock-agentcore/`
+### 2. Bedrock AgentCore (Production-Ready) - `src/bedrock-agentcore-itsm/`
 
 **Best for**: Production deployments requiring enterprise-grade customization and control
 
@@ -65,8 +65,8 @@ This solution offers two distinct Amazon Bedrock implementations, each designed 
 This project includes the following files and folders:
 
 - * **docs** - Directory containing supporting documents
-- * **src/bedrock-agent-itsm** - Directory containing SAM template for Bedrock Agents implementation
-- * **src/bedrock-agentcore** - Directory containing AgentCore container-based implementation
+- * **src/bedrock-agents-itsm** - Directory containing SAM template for Bedrock Agents implementation
+- * **src/bedrock-agentcore-itsm** - Directory containing AgentCore container-based implementation
 - * **src/chat-app** - Directory containing SAM template for the chat application frontend and API
 - * **src/chat-app/web** - Directory containing the web application code for the chat interface
 
@@ -155,7 +155,7 @@ Choose one of the two implementation options below and follow the detailed deplo
 
 **Best for**: Rapid prototyping and proof-of-concept development
 
-For complete step-by-step deployment instructions, see: **[src/bedrock-agent-itsm/README.md](src/bedrock-agent-itsm/README.md)**
+For complete step-by-step deployment instructions, see: **[src/bedrock-agents-itsm/README.md](src/bedrock-agents-itsm/README.md)**
 
 **Quick Overview:**
 1. Deploy the Bedrock Agent ITSM template using SAM CLI
@@ -169,7 +169,7 @@ For complete step-by-step deployment instructions, see: **[src/bedrock-agent-its
 
 **Best for**: Production deployments requiring enterprise-grade customization and control
 
-For complete step-by-step deployment instructions, see: **[src/bedrock-agentcore/README.md](src/bedrock-agentcore/README.md)**
+For complete step-by-step deployment instructions, see: **[src/bedrock-agentcore-itsm/README.md](src/bedrock-agentcore-itsm/README.md)**
 
 **Quick Overview:**
 1. Validate AWS environment and service availability
@@ -207,7 +207,7 @@ This application is composed of multiple components, each defined by its own SAM
 
 ### Bedrock Agents Architecture (Prototype-Focused)
 
-The Bedrock Agents template (`src/bedrock-agent-itsm/template.yml`) creates a fully managed solution optimized for rapid prototyping:
+The Bedrock Agents template (`src/bedrock-agents-itsm/template.yml`) creates a fully managed solution optimized for rapid prototyping:
 
 **AWS Resources Created**:
 * **Amazon Bedrock Agent** - Managed agent with built-in orchestration
@@ -230,7 +230,7 @@ The Bedrock Agents template (`src/bedrock-agent-itsm/template.yml`) creates a fu
 
 ### Bedrock AgentCore Architecture (Production-Ready)
 
-The AgentCore template (`src/bedrock-agentcore/template.yml`) provides an enterprise-grade runtime environment:
+The AgentCore template (`src/bedrock-agentcore-itsm/template.yml`) provides an enterprise-grade runtime environment:
 
 **AWS Resources Created**:
 * **Bedrock AgentCore Runtime** - Container-based agent execution environment
@@ -300,7 +300,7 @@ To delete the sample application, use the AWS CLI. The cleanup process depends o
 ### For Bedrock Agents Implementation
 ```bash
 aws cloudformation delete-stack --stack-name bedrock-agent-chat-app
-aws cloudformation delete-stack --stack-name bedrock-agent-itsm
+aws cloudformation delete-stack --stack-name bedrock-agents-itsm
 ```
 
 ### For Bedrock AgentCore Implementation
@@ -322,7 +322,7 @@ docker rmi bedrock-agentcore-itsm-agent:latest
 aws cloudformation delete-stack --stack-name bedrock-agent-chat-app
 
 # Delete both backend implementations
-aws cloudformation delete-stack --stack-name bedrock-agent-itsm
+aws cloudformation delete-stack --stack-name bedrock-agents-itsm
 aws cloudformation delete-stack --stack-name bedrock-agentcore-itsm
 
 # Clean up AgentCore container resources

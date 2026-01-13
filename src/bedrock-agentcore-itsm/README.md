@@ -94,7 +94,7 @@ aws ecr describe-repositories --region $AWS_REGION --max-results 1
 Navigate to the AgentCore directory:
 
 ```bash
-cd src/bedrock-agentcore
+cd src/bedrock-agentcore-itsm
 ```
 
 Create a Dockerfile for the AgentCore runtime:

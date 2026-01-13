@@ -26,17 +26,17 @@ The deployment process consists of four main steps:
 
 ### Step 1: Deploy the Bedrock Agent ITSM Template
 
-Navigate to the **src/bedrock-agent-itsm** directory and run the following commands:
+Navigate to the **src/bedrock-agents-itsm** directory and run the following commands:
 
 ```bash
-cd src/bedrock-agent-itsm
+cd src/bedrock-agents-itsm
 sam build
 sam deploy --guided --capabilities CAPABILITY_NAMED_IAM
 ```
 
 During the guided deployment, you'll be prompted for several parameters:
 
-* **Stack Name**: The name of the stack to deploy to CloudFormation (e.g., `bedrock-agent-itsm`)
+* **Stack Name**: The name of the stack to deploy to CloudFormation (e.g., `bedrock-agents-itsm`)
 * **AWS Region**: The region to deploy your resources
 * **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review
 * **Allow SAM CLI IAM role creation**: Many AWS SAM templates create AWS IAM roles required for the Lambda functions to access AWS services
@@ -63,7 +63,7 @@ Follow the deployment instructions in [src/chat-app/README.md](../chat-app/READM
 After the initial guided deployment, you can use the following commands for subsequent deployments:
 
 ```bash
-cd src/bedrock-agent-itsm
+cd src/bedrock-agents-itsm
 sam build
 sam deploy --capabilities CAPABILITY_NAMED_IAM
 ```
@@ -107,8 +107,8 @@ The Bedrock Agents implementation creates a fully managed solution optimized for
 Use SAM CLI to fetch logs from your Lambda functions:
 
 ```bash
-sam logs -n CreateITSMFunction --stack-name bedrock-agent-itsm --tail
-sam logs -n LookupITSMFunction --stack-name bedrock-agent-itsm --tail
+sam logs -n CreateITSMFunction --stack-name bedrock-agents-itsm --tail
+sam logs -n LookupITSMFunction --stack-name bedrock-agents-itsm --tail
 ```
 
 You can also monitor the Bedrock Agent performance through the AWS Console:

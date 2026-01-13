@@ -757,7 +757,7 @@ Resources:
       Description: AgentCore Runtime for ITSM solution
       ExecutionRoleArn: !GetAtt AgentCoreExecutionRole.Arn
       ContainerConfiguration:
-        ImageUri: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/bedrock-agentcore-itsm:latest
+        ImageUri: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/bedrock-agentcore-itsm-agent-repo:latest
         EnvironmentVariables:
           - Name: KNOWLEDGE_BASE_ID
             Value: !GetAtt BedrockKnowledgeBase.KnowledgeBaseId
