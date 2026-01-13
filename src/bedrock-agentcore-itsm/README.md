@@ -58,6 +58,9 @@ aws configure --profile myprofile
 
 # Verify your identity
 aws sts get-caller-identity
+
+# Or verify identity for a specific profile
+aws sts get-caller-identity --profile myprofile
 ```
 
 ## Deployment Process
