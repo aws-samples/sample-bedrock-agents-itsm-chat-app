@@ -749,34 +749,9 @@ Resources:
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayITSM}/*/GET/lookup
   # AgentCore Runtime Resources
   
-  # AgentCore Runtime
-  BedrockAgentCoreRuntime:
-    Type: AWS::BedrockAgentCore::Runtime
-    Properties:
-      RuntimeName: !Sub ${AWS::StackName}-agentcore-runtime
-      Description: AgentCore Runtime for ITSM solution
-      ExecutionRoleArn: !GetAtt AgentCoreExecutionRole.Arn
-      ContainerConfiguration:
-        ImageUri: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/bedrock-agentcore-itsm-agent-repo:latest
-        EnvironmentVariables:
-          - Name: KNOWLEDGE_BASE_ID
-            Value: !GetAtt BedrockKnowledgeBase.KnowledgeBaseId
-          - Name: API_GATEWAY_URL
-            Value: !Sub https://${ApiGatewayITSM}.execute-api.${AWS::Region}.amazonaws.com/prd
-          - Name: AWS_REGION
-            Value: !Ref AWS::Region
-        MemorySize: 1024
-        TimeoutInSeconds: 300
-      RuntimeEndpointConfiguration:
-        VpcConfiguration:
-          SecurityGroupIds: []
-          SubnetIds: []
-        EndpointType: PUBLIC
-      Tags:
-        - Key: Application
-          Value: ITSM-AgentCore
-        - Key: Environment
-          Value: Demo
+  # Note: AgentCore Runtime will be deployed separately using the container image
+  # The container image URI is: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/bedrock-agentcore-itsm-agent-repo:latest
+  
   # IAM Roles and Policies for AgentCore
   
   # AgentCore Execution Role
@@ -875,17 +850,11 @@ Outputs:
     Description: S3 Bucket for Knowledge Base documents
     Value: !Ref S3BucketBKB
     
-  AgentCoreRuntimeId:
-    Description: Bedrock AgentCore Runtime ID
-    Value: !Ref BedrockAgentCoreRuntime
+  ContainerImageUri:
+    Description: Container Image URI for AgentCore deployment
+    Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/bedrock-agentcore-itsm-agent-repo:latest
     Export:
-      Name: "ITSMAgentCoreRuntimeId"
-    
-  AgentCoreRuntimeEndpoint:
-    Description: Bedrock AgentCore Runtime Endpoint
-    Value: !GetAtt BedrockAgentCoreRuntime.RuntimeEndpoint
-    Export:
-      Name: "ITSMAgentCoreRuntimeEndpoint"
+      Name: "ITSMContainerImageUri"
 
   KnowledgeBaseId:
     Description: Bedrock Knowledge Base ID

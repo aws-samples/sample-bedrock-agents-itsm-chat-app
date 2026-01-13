@@ -1,0 +1,10 @@
+{
+  "name": "create-itsm-function",
+  "version": "1.0.0",
+  "description": "Lambda function to create ITSM tickets",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0"
+  }
+}

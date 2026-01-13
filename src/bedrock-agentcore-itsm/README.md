@@ -183,15 +183,14 @@ Deploy the CloudFormation stack:
 ```bash
 # Set deployment parameters
 export STACK_NAME=bedrock-agentcore-itsm
-export CONTAINER_IMAGE_URI=$IMAGE_URI
 
 # Deploy the CloudFormation stack
 sam deploy \
     --template-file template.yml \
     --stack-name $STACK_NAME \
-    --capabilities CAPABILITY_IAM \
+    --capabilities CAPABILITY_NAMED_IAM \
     --region $AWS_REGION \
-    --parameter-overrides ContainerImageUri=$CONTAINER_IMAGE_URI \
+    --resolve-s3 \
     --no-confirm-changeset
 ```
 
