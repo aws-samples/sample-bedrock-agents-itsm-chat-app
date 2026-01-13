@@ -75,8 +75,8 @@ First, validate that all required AWS services are available in your target regi
 # Set your target region
 export AWS_REGION=us-east-1
 
-# Check Bedrock AgentCore availability
-aws bedrock-agent-runtime list-knowledge-bases --region $AWS_REGION --max-results 1
+# Check Bedrock Agent availability
+aws bedrock-agent list-knowledge-bases --region $AWS_REGION --max-results 1
 
 # Check other required services
 aws dynamodb list-tables --region $AWS_REGION --limit 1
