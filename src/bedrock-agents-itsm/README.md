@@ -13,7 +13,7 @@ Before deploying the Bedrock Agents implementation, ensure you have the followin
 
 ## Architecture
 
-![Architecture Diagram](docs/bedrock-agents-itsm.png)
+![Architecture Diagram](/docs/bedrock-agents-itsm.png)
 
 ## Deployment Process
 
