@@ -154,7 +154,8 @@ aws ecr create-repository \
 export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
 # Set the full image URI
-export IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPO_NAME:latest
+export IMAGE_TAG=latest
+export IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPO_NAME:$IMAGE_TAG
 
 echo "Image URI: $IMAGE_URI"
 ```
