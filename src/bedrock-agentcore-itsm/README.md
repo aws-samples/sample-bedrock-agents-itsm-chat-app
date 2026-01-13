@@ -56,6 +56,9 @@ aws configure
 # Or use a specific profile
 aws configure --profile myprofile
 
+# Set the profile as default for all commands (optional)
+export AWS_PROFILE=myprofile
+
 # Verify your identity
 aws sts get-caller-identity
 
@@ -74,6 +77,9 @@ First, validate that all required AWS services are available in your target regi
 ```bash
 # Set your target region
 export AWS_REGION=us-east-1
+
+# If using a specific profile, set it now (optional)
+# export AWS_PROFILE=myprofile
 
 # Check Bedrock Agent availability
 aws bedrock-agent list-knowledge-bases --region $AWS_REGION --max-results 1
