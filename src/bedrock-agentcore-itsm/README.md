@@ -259,16 +259,13 @@ Create the AgentCore runtime:
 
 ```bash
 aws bedrock-agentcore-control create-agent-runtime \
-    --agent-runtime-name bedrock-agentcore-itsm-runtime \
+    --agent-runtime-name bedrock_agentcore_itsm_runtime \
     --description "AgentCore Runtime for ITSM solution" \
     --role-arn $EXECUTION_ROLE_ARN \
     --agent-runtime-artifact containerConfiguration={containerUri=$IMAGE_URI} \
     --network-configuration networkMode=PUBLIC \
     --protocol-configuration serverProtocol=HTTP \
-    --environment-variables \
-        KNOWLEDGE_BASE_ID=$KNOWLEDGE_BASE_ID \
-        API_GATEWAY_URL=$API_GATEWAY_URL \
-        AWS_REGION=$AWS_REGION \
+    --environment-variables KNOWLEDGE_BASE_ID=$KNOWLEDGE_BASE_ID,API_GATEWAY_URL=$API_GATEWAY_URL,AWS_REGION=$AWS_REGION \
     --region $AWS_REGION
 ```
 
@@ -287,7 +284,7 @@ Create a runtime endpoint:
 ```bash
 aws bedrock-agentcore-control create-agent-runtime-endpoint \
     --agent-runtime-arn $AGENT_RUNTIME_ARN \
-    --endpoint-name bedrock-agentcore-itsm-endpoint \
+    --endpoint-name bedrock_agentcore_itsm_endpoint \
     --region $AWS_REGION
 ```
 
