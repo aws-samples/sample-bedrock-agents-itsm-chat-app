@@ -149,6 +149,7 @@ Thumbs.db
 
 # Docker
 .dockerignore
+Dockerfile
 
 # Node.js
 node_modules/

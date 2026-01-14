@@ -41,7 +41,7 @@ Resources:
       - OpenSearchAccessPolicy
       - OpenSearchEncryptionPolicy
     Properties:
-      Name: !Sub ${AWS::StackName}-kb-collection
+      Name: !Sub ${AWS::StackName}-kb-col
       Type: VECTORSEARCH
       Description: Collection for Bedrock Knowledge Base
       StandbyReplicas: DISABLED
@@ -58,11 +58,11 @@ Resources:
           "Rules": [
             {
               "ResourceType": "dashboard",
-              "Resource": ["collection/${AWS::StackName}-kb-collection"]
+              "Resource": ["collection/${AWS::StackName}-kb-col"]
             },
             {
               "ResourceType": "collection",
-              "Resource": ["collection/${AWS::StackName}-kb-collection"]
+              "Resource": ["collection/${AWS::StackName}-kb-col"]
             }
           ],
           "AllowFromPublic": true
@@ -80,7 +80,7 @@ Resources:
           "Rules": [
             {
               "ResourceType": "collection",
-              "Resource": ["collection/${AWS::StackName}-kb-collection"],
+              "Resource": ["collection/${AWS::StackName}-kb-col"],
               "Permission": [
                 "aoss:DescribeCollectionItems",
                 "aoss:CreateCollectionItems",
@@ -89,7 +89,7 @@ Resources:
             },
             {
               "ResourceType": "index",
-              "Resource": ["index/${AWS::StackName}-kb-collection/*"],
+              "Resource": ["index/${AWS::StackName}-kb-col/*"],
               "Permission": [
                 "aoss:UpdateIndex",
                 "aoss:DescribeIndex",
@@ -118,7 +118,7 @@ Resources:
           "Rules": [
             {
               "ResourceType": "collection",
-              "Resource": ["collection/${AWS::StackName}-kb-collection"]
+              "Resource": ["collection/${AWS::StackName}-kb-col"]
             }
           ],
           "AWSOwnedKey": true
@@ -177,7 +177,7 @@ Resources:
                   
                   if request_type == 'Create' or request_type == 'Update':
                       collection_endpoint = event['ResourceProperties']['CollectionEndpoint']
-                      index_name = event['ResourceProperties'].get('IndexName', '!Sub ${AWS::StackName}-kb-collection')
+                      index_name = event['ResourceProperties'].get('IndexName', '!Sub ${AWS::StackName}-kb-col')
                       
                       create_index(collection_endpoint, index_name)
                       response_data['Message'] = f"Successfully created index {index_name}"
@@ -283,7 +283,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt OpenSearchIndexCreatorFunction.Arn
       CollectionEndpoint: !GetAtt OpenSearchCollection.CollectionEndpoint
-      IndexName: !Sub ${AWS::StackName}-kb-collection
+      IndexName: !Sub ${AWS::StackName}-kb-col
 
   # Separate IAM Policy for OpenSearchIndexCreatorRole to break circular dependency
   OpenSearchIndexCreatorPolicy:
@@ -480,7 +480,7 @@ Resources:
         Type: OPENSEARCH_SERVERLESS
         OpensearchServerlessConfiguration:
           CollectionArn: !GetAtt OpenSearchCollection.Arn
-          VectorIndexName: !Sub ${AWS::StackName}-kb-collection
+          VectorIndexName: !Sub ${AWS::StackName}-kb-col
           FieldMapping:
             VectorField: bedrock-knowledge-base-default-vector
             TextField: AMAZON_BEDROCK_TEXT_CHUNK
@@ -506,7 +506,7 @@ Resources:
       FunctionName: !Sub ${AWS::StackName}-ITSM-Create
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRoleCreate.Arn
-      Runtime: nodejs22.x
+      Runtime: nodejs20.x
       Environment:
         Variables:
           TABLE_NAME: !Ref TicketsTable
@@ -518,7 +518,7 @@ Resources:
       FunctionName: !Sub ${AWS::StackName}-ITSM-Lookup
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRoleLookup.Arn
-      Runtime: nodejs22.x
+      Runtime: nodejs20.x
       Environment:
         Variables:
           TABLE_NAME: !Ref TicketsTable

@@ -27,6 +27,8 @@ Before deploying the AgentCore implementation, ensure you have:
 * **Docker** - For building container images  
 * **SAM CLI** - For deploying serverless applications
 * **Python 3.11+** - For running validation scripts
+* **Node.js 18+** - For building Lambda functions
+* **npm** - Node package manager (included with Node.js)
 
 ### Installation Commands
 
@@ -40,11 +42,16 @@ brew install docker
 # Install SAM CLI
 brew install aws-sam-cli
 
+# Install Node.js (includes npm)
+brew install node
+
 # Verify installations
 aws --version
 docker --version
 sam --version
 python3 --version
+node --version
+npm --version
 ```
 
 ### AWS Configuration
@@ -184,6 +191,9 @@ Deploy the CloudFormation stack:
 # Set deployment parameters
 export STACK_NAME=bedrock-agentcore-itsm
 
+# Build the SAM application
+sam build
+
 # Deploy the CloudFormation stack
 sam deploy \
     --template-file template.yml \
@@ -212,7 +222,76 @@ aws cloudformation describe-stacks \
     --output text
 ```
 
-### Step 5: Verify Deployment
+### Step 5: Create AgentCore Runtime
+
+**Note:** Bedrock AgentCore requires ARM64 architecture for container images. The AgentCore runtime will be created using the AWS CLI.
+
+Get the required values from CloudFormation:
+
+```bash
+# Get Knowledge Base ID
+export KNOWLEDGE_BASE_ID=$(aws cloudformation describe-stacks \
+    --stack-name $STACK_NAME \
+    --region $AWS_REGION \
+    --query 'Stacks[0].Outputs[?OutputKey==`KnowledgeBaseId`].OutputValue' \
+    --output text)
+
+# Get API Gateway URL
+export API_GATEWAY_URL=$(aws cloudformation describe-stacks \
+    --stack-name $STACK_NAME \
+    --region $AWS_REGION \
+    --query 'Stacks[0].Outputs[?OutputKey==`ApiGatewayUrl`].OutputValue' \
+    --output text)
+
+# Get Execution Role ARN
+export EXECUTION_ROLE_ARN=$(aws iam get-role \
+    --role-name $STACK_NAME-AgentCoreExecutionRole \
+    --query 'Role.Arn' \
+    --output text)
+
+echo "Knowledge Base ID: $KNOWLEDGE_BASE_ID"
+echo "API Gateway URL: $API_GATEWAY_URL"
+echo "Execution Role ARN: $EXECUTION_ROLE_ARN"
+echo "Container Image URI: $IMAGE_URI"
+```
+
+Create the AgentCore runtime:
+
+```bash
+aws bedrock-agentcore-control create-agent-runtime \
+    --agent-runtime-name bedrock-agentcore-itsm-runtime \
+    --description "AgentCore Runtime for ITSM solution" \
+    --role-arn $EXECUTION_ROLE_ARN \
+    --agent-runtime-artifact containerConfiguration={containerUri=$IMAGE_URI} \
+    --network-configuration networkMode=PUBLIC \
+    --protocol-configuration serverProtocol=HTTP \
+    --environment-variables \
+        KNOWLEDGE_BASE_ID=$KNOWLEDGE_BASE_ID \
+        API_GATEWAY_URL=$API_GATEWAY_URL \
+        AWS_REGION=$AWS_REGION \
+    --region $AWS_REGION
+```
+
+Save the runtime ARN from the output:
+
+```bash
+# Get the runtime ARN from the create command output
+export AGENT_RUNTIME_ARN=<runtime-arn-from-output>
+
+# Or list runtimes to find it
+aws bedrock-agentcore-control list-agent-runtimes --region $AWS_REGION
+```
+
+Create a runtime endpoint:
+
+```bash
+aws bedrock-agentcore-control create-agent-runtime-endpoint \
+    --agent-runtime-arn $AGENT_RUNTIME_ARN \
+    --endpoint-name bedrock-agentcore-itsm-endpoint \
+    --region $AWS_REGION
+```
+
+### Step 6: Verify Deployment
 
 Get the stack outputs and test the deployment:
 
@@ -225,20 +304,20 @@ aws cloudformation describe-stacks \
     --output table
 
 # Get the API endpoint
-export API_ENDPOINT=$(aws cloudformation describe-stacks \
+export API_GATEWAY_URL=$(aws cloudformation describe-stacks \
     --stack-name $STACK_NAME \
     --region $AWS_REGION \
-    --query 'Stacks[0].Outputs[?OutputKey==`ApiEndpoint`].OutputValue' \
+    --query 'Stacks[0].Outputs[?OutputKey==`ApiGatewayUrl`].OutputValue' \
     --output text)
 
-echo "API Endpoint: $API_ENDPOINT"
+echo "API Gateway URL: $API_GATEWAY_URL"
 ```
 
 Test the API:
 
 ```bash
 # Test ticket creation
-curl -X POST $API_ENDPOINT/create \
+curl -X POST $API_GATEWAY_URL/create \
     -H "Content-Type: application/json" \
     -d '{
         "tickettype": "INC",
@@ -248,10 +327,10 @@ curl -X POST $API_ENDPOINT/create \
     }'
 
 # Test ticket lookup (use the ticket number from the create response)
-curl -X GET "$API_ENDPOINT/lookup?ticketNumber=INC12345678"
+curl -X GET "$API_GATEWAY_URL/lookup?ticketNumber=INC12345678"
 ```
 
-### Step 6: Deploy Chat Application
+### Step 7: Deploy Chat Application
 
 The chat application is shared between both implementations. Navigate to the chat app directory and deploy:
 
