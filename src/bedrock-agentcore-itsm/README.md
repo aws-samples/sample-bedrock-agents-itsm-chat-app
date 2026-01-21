@@ -32,20 +32,28 @@ Before deploying the AgentCore implementation, ensure you have:
 
 ### Installation Commands
 
+Install AWS CLI (macOS):
 ```bash
-# Install AWS CLI (macOS)
 brew install awscli
+```
 
-# Install Docker (macOS)
+Install Docker (macOS):
+```bash
 brew install docker
+```
 
-# Install SAM CLI
+Install SAM CLI:
+```bash
 brew install aws-sam-cli
+```
 
-# Install Node.js (includes npm)
+Install Node.js (includes npm):
+```bash
 brew install node
+```
 
-# Verify installations
+Verify installations:
+```bash
 aws --version
 docker --version
 sam --version
@@ -56,20 +64,28 @@ npm --version
 
 ### AWS Configuration
 
+Configure AWS credentials:
 ```bash
-# Configure AWS credentials
 aws configure
+```
 
-# Or use a specific profile
+Or use a specific profile:
+```bash
 aws configure --profile myprofile
+```
 
-# Set the profile as default for all commands (optional)
+Set the profile as default for all commands (optional):
+```bash
 export AWS_PROFILE=myprofile
+```
 
-# Verify your identity
+Verify your identity:
+```bash
 aws sts get-caller-identity
+```
 
-# Or verify identity for a specific profile
+Or verify identity for a specific profile:
+```bash
 aws sts get-caller-identity --profile myprofile
 ```
 
@@ -79,19 +95,25 @@ The AgentCore deployment is designed for production environments. You'll execute
 
 ### Step 1: Environment Validation
 
-First, validate that all required AWS services are available in your target region:
+First, validate that all required AWS services are available in your target region.
 
+Set your target region:
 ```bash
-# Set your target region
 export AWS_REGION=us-east-1
+```
 
-# If using a specific profile, set it now (optional)
-# export AWS_PROFILE=myprofile
+If using a specific profile, set it now (optional):
+```bash
+export AWS_PROFILE=myprofile
+```
 
-# Check Bedrock Agent availability
+Check Bedrock Agent availability:
+```bash
 aws bedrock-agent list-knowledge-bases --region $AWS_REGION --max-results 1
+```
 
-# Check other required services
+Check other required services:
+```bash
 aws dynamodb list-tables --region $AWS_REGION --limit 1
 aws s3 ls
 aws opensearch list-domain-names --region $AWS_REGION
@@ -108,13 +130,11 @@ aws ecr describe-repositories --region $AWS_REGION --max-results 1
 ### Step 2: Container Preparation
 
 Navigate to the AgentCore directory:
-
 ```bash
 cd src/bedrock-agentcore-itsm
 ```
 
 Create a Dockerfile for the AgentCore runtime:
-
 ```bash
 cat > Dockerfile << 'EOF'
 # AgentCore requires ARM64 architecture
@@ -143,70 +163,85 @@ CMD ["python", "-m", "bedrock_agentcore_runtime", "agent_runtime:app"]
 EOF
 ```
 
-Build the container image:
-
+Build the container image for ARM64 (required by AgentCore). If builder doesn't exist, create it:
 ```bash
-# Build the container image for ARM64 (required by AgentCore)
-# If builder doesn't exist, create it
 docker buildx create --use --name agentcore-builder 2>/dev/null || docker buildx use agentcore-builder
-
 docker buildx build --platform linux/arm64 -t bedrock-agentcore-itsm-agent --load .
+```
 
-# Verify the image was created
+Verify the image was created:
+```bash
 docker images | grep bedrock-agentcore-itsm-agent
 ```
 
 ### Step 3: ECR Repository Setup
 
-Create an ECR repository and push your container:
+Create an ECR repository and push your container.
 
+Set repository name:
 ```bash
-# Set repository name
 export REPO_NAME=bedrock-agentcore-itsm-agent-repo
+```
 
-# Create ECR repository
+Create ECR repository:
+```bash
 aws ecr create-repository \
     --repository-name $REPO_NAME \
     --region $AWS_REGION
+```
 
-# Get your AWS account ID
+Get your AWS account ID:
+```bash
 export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+```
 
-# Set the full image URI
+Set the full image URI:
+```bash
 export IMAGE_TAG=latest
 export IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPO_NAME:$IMAGE_TAG
+```
 
+Display the image URI:
+```bash
 echo "Image URI: $IMAGE_URI"
 ```
 
-Push the container to ECR:
-
+Push the container to ECR. Get ECR login token and login to Docker:
 ```bash
-# Get ECR login token and login to Docker
 aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+```
 
-# Tag your local image with the ECR URI
+Tag your local image with the ECR URI:
+```bash
 docker tag bedrock-agentcore-itsm-agent:latest $IMAGE_URI
+```
 
-# Push the image to ECR
+Push the image to ECR:
+```bash
 docker push $IMAGE_URI
+```
 
-# Verify the push
+Verify the push:
+```bash
 aws ecr describe-images --repository-name $REPO_NAME --region $AWS_REGION
 ```
 
 ### Step 4: CloudFormation Deployment
 
-Deploy the CloudFormation stack:
+Deploy the CloudFormation stack.
 
+Set deployment parameters:
 ```bash
-# Set deployment parameters
 export STACK_NAME=bedrock-agentcore-itsm
+```
 
-# Build the SAM application
+Build the SAM application:
+```bash
 sam build
+```
 
-# Deploy the CloudFormation stack
+Deploy the CloudFormation stack:
+```bash
 sam deploy \
     --template-file template.yml \
     --stack-name $STACK_NAME \
@@ -215,17 +250,17 @@ sam deploy \
     --no-confirm-changeset
 ```
 
-Monitor the deployment progress:
-
+Monitor the deployment progress. Watch the deployment progress:
 ```bash
-# Watch the deployment progress
 aws cloudformation describe-stack-events \
     --stack-name $STACK_NAME \
     --region $AWS_REGION \
     --query 'StackEvents[*].[Timestamp,ResourceStatus,ResourceType,LogicalResourceId]' \
     --output table
+```
 
-# Check final deployment status
+Check final deployment status:
+```bash
 aws cloudformation describe-stacks \
     --stack-name $STACK_NAME \
     --region $AWS_REGION \
@@ -237,29 +272,34 @@ aws cloudformation describe-stacks \
 
 **Note:** Bedrock AgentCore requires ARM64 architecture for container images. The AgentCore runtime will be created using the AWS CLI.
 
-Get the required values from CloudFormation:
-
+Get the required values from CloudFormation. Get Knowledge Base ID:
 ```bash
-# Get Knowledge Base ID
 export KNOWLEDGE_BASE_ID=$(aws cloudformation describe-stacks \
     --stack-name $STACK_NAME \
     --region $AWS_REGION \
     --query 'Stacks[0].Outputs[?OutputKey==`KnowledgeBaseId`].OutputValue' \
     --output text)
+```
 
-# Get API Gateway URL
+Get API Gateway URL:
+```bash
 export API_GATEWAY_URL=$(aws cloudformation describe-stacks \
     --stack-name $STACK_NAME \
     --region $AWS_REGION \
     --query 'Stacks[0].Outputs[?OutputKey==`ApiGatewayUrl`].OutputValue' \
     --output text)
+```
 
-# Get Execution Role ARN
+Get Execution Role ARN:
+```bash
 export EXECUTION_ROLE_ARN=$(aws iam get-role \
     --role-name $STACK_NAME-AgentCoreExecutionRole \
     --query 'Role.Arn' \
     --output text)
+```
 
+Display the values:
+```bash
 echo "Knowledge Base ID: $KNOWLEDGE_BASE_ID"
 echo "API Gateway URL: $API_GATEWAY_URL"
 echo "Execution Role ARN: $EXECUTION_ROLE_ARN"
@@ -267,7 +307,6 @@ echo "Container Image URI: $IMAGE_URI"
 ```
 
 Create the AgentCore runtime:
-
 ```bash
 aws bedrock-agentcore-control create-agent-runtime \
     --agent-runtime-name bedrock_agentcore_itsm_runtime \
@@ -280,18 +319,18 @@ aws bedrock-agentcore-control create-agent-runtime \
     --region $AWS_REGION
 ```
 
-Save the runtime ID from the output:
-
+Save the runtime ID from the output. Get the runtime ID from the create command output or list runtimes to find it:
 ```bash
-# Get the runtime ID from the create command output
-export AGENT_RUNTIME_ID=<runtime-id-from-output>
-
-# Or list runtimes to find it
 aws bedrock-agentcore-control list-agent-runtimes --region $AWS_REGION
 ```
 
-Check if a default endpoint was created:
+Set the runtime ID and ARN (replace with actual values from output):
+```bash
+export AGENT_RUNTIME_ID=<runtime-id-from-output>
+export AGENT_RUNTIME_ARN=<runtime-arn-from-output>
+```
 
+Check if a default endpoint was created:
 ```bash
 aws bedrock-agentcore-control list-agent-runtime-endpoints \
     --agent-runtime-id $AGENT_RUNTIME_ID \
@@ -299,7 +338,6 @@ aws bedrock-agentcore-control list-agent-runtime-endpoints \
 ```
 
 If no endpoint exists, create one (optional - a default endpoint is usually created automatically):
-
 ```bash
 aws bedrock-agentcore-control create-agent-runtime-endpoint \
     --agent-runtime-id $AGENT_RUNTIME_ID \
@@ -311,62 +349,66 @@ aws bedrock-agentcore-control create-agent-runtime-endpoint \
 
 ### Step 6: Verify Deployment
 
-Get the stack outputs:
-
+Get the stack outputs. Get all stack outputs:
 ```bash
-# Get all stack outputs
 aws cloudformation describe-stacks \
     --stack-name $STACK_NAME \
     --region $AWS_REGION \
     --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' \
     --output table
+```
 
-# Get the API endpoint
+Get the API Gateway URL:
+```bash
 export API_GATEWAY_URL=$(aws cloudformation describe-stacks \
     --stack-name $STACK_NAME \
     --region $AWS_REGION \
     --query 'Stacks[0].Outputs[?OutputKey==`ApiGatewayUrl`].OutputValue' \
     --output text)
+```
 
+Display the API Gateway URL:
+```bash
 echo "API Gateway URL: $API_GATEWAY_URL"
 ```
 
-Test the underlying Lambda functions (optional):
-
+Test the underlying Lambda functions (optional). Test ticket creation Lambda directly:
 ```bash
-# Test ticket creation Lambda directly
 aws lambda invoke \
     --function-name $STACK_NAME-ITSM-Create \
     --payload '{"tickettype":"INC","description":"Test ticket","impact":"Low","urgency":"Low"}' \
     --region $AWS_REGION \
     response.json
+```
 
+View the response:
+```bash
 cat response.json
 ```
 
 ### Step 7: Invoke the AgentCore Agent
 
-Get the agent runtime ARN:
-
+Get the agent runtime ARN. List runtimes to get the ARN:
 ```bash
-# List runtimes to get the ARN
 aws bedrock-agentcore-control list-agent-runtimes --region $AWS_REGION
+```
 
-# Set the runtime ARN
+Set the runtime ARN (replace with actual value from output):
+```bash
 export AGENT_RUNTIME_ARN=<runtime-arn-from-list>
 ```
 
-Invoke the AgentCore agent with natural language:
-
+Invoke the AgentCore agent with natural language. Create a payload file for ticket creation:
 ```bash
-# Create a payload file for ticket creation
 cat > payload.json << 'EOF'
 {
   "prompt": "Create a high priority incident ticket for a server outage in production"
 }
 EOF
+```
 
-# Invoke the agent
+Invoke the agent:
+```bash
 aws bedrock-agentcore invoke-agent-runtime \
     --agent-runtime-arn $AGENT_RUNTIME_ARN \
     --payload file://payload.json \
@@ -374,16 +416,23 @@ aws bedrock-agentcore invoke-agent-runtime \
     --cli-binary-format raw-in-base64-out \
     --region $AWS_REGION \
     output.json
+```
 
+View the response:
+```bash
 cat output.json
+```
 
-# Query the knowledge base
+Query the knowledge base:
+```bash
 cat > payload.json << 'EOF'
 {
   "prompt": "What is the password reset policy?"
 }
 EOF
+```
 
+```bash
 aws bedrock-agentcore invoke-agent-runtime \
     --agent-runtime-arn $AGENT_RUNTIME_ARN \
     --payload file://payload.json \
@@ -391,16 +440,22 @@ aws bedrock-agentcore invoke-agent-runtime \
     --cli-binary-format raw-in-base64-out \
     --region $AWS_REGION \
     output.json
+```
 
+```bash
 cat output.json
+```
 
-# Look up a ticket
+Look up a ticket:
+```bash
 cat > payload.json << 'EOF'
 {
   "prompt": "Look up ticket INC12345678"
 }
 EOF
+```
 
+```bash
 aws bedrock-agentcore invoke-agent-runtime \
     --agent-runtime-arn $AGENT_RUNTIME_ARN \
     --payload file://payload.json \
@@ -408,7 +463,9 @@ aws bedrock-agentcore invoke-agent-runtime \
     --cli-binary-format raw-in-base64-out \
     --region $AWS_REGION \
     output.json
+```
 
+```bash
 cat output.json
 ```
 
@@ -419,15 +476,17 @@ The AgentCore agent will:
 4. Call the appropriate Lambda function via API Gateway
 5. Return a natural language response
 
-**Troubleshooting:** If you get a 404 error, check the CloudWatch logs:
+**Troubleshooting:** If you get a 404 error, check the CloudWatch logs.
 
+Get the log group name for your runtime:
 ```bash
-# Get the log group name for your runtime
 aws logs describe-log-groups \
     --log-group-name-prefix /aws/bedrock-agentcore \
     --region $AWS_REGION
+```
 
-# View recent logs
+View recent logs:
+```bash
 aws logs tail /aws/bedrock-agentcore/bedrock_agentcore_itsm_runtime \
     --follow \
     --region $AWS_REGION
@@ -441,19 +500,24 @@ Common issues:
 
 **Updating the AgentCore Image:**
 
-If you need to update the agent code and redeploy:
-
+If you need to update the agent code and redeploy, navigate to the directory:
 ```bash
 cd src/bedrock-agentcore-itsm
+```
 
-# Rebuild the image
+Rebuild the image:
+```bash
 docker buildx build --platform linux/arm64 -t bedrock-agentcore-itsm-agent --load .
+```
 
-# Tag and push to ECR
+Tag and push to ECR:
+```bash
 docker tag bedrock-agentcore-itsm-agent:latest $IMAGE_URI
 docker push $IMAGE_URI
+```
 
-# Update the runtime with the new image
+Update the runtime with the new image:
+```bash
 aws bedrock-agentcore-control update-agent-runtime \
     --agent-runtime-id $AGENT_RUNTIME_ID \
     --role-arn $EXECUTION_ROLE_ARN \
@@ -465,25 +529,26 @@ aws bedrock-agentcore-control update-agent-runtime \
 ### Step 8: Deploy Chat Application
 
 The chat application is shared between both implementations. Navigate to the chat app directory and deploy:
-
 ```bash
 cd ../chat-app
+```
 
+```bash
 sam build
 sam deploy --guided --capabilities CAPABILITY_NAMED_IAM
 ```
 
-Upload the web files:
-
+Upload the web files. Get the S3 bucket name from CloudFormation outputs:
 ```bash
-# Get the S3 bucket name from CloudFormation outputs
 export WEB_BUCKET=$(aws cloudformation describe-stacks \
     --stack-name bedrock-agent-chat-app \
     --region $AWS_REGION \
     --query 'Stacks[0].Outputs[?OutputKey==`S3BucketName`].OutputValue' \
     --output text)
+```
 
-# Upload web files
+Upload web files:
+```bash
 aws s3 cp web/ s3://$WEB_BUCKET/ --recursive
 ```
 
@@ -506,29 +571,38 @@ CloudFormation template that defines the AgentCore runtime, shared resources, an
 ## Troubleshooting
 
 ### Container Build Issues
+
+Check Docker daemon:
 ```bash
-# Check Docker daemon
 docker info
+```
 
-# Clean Docker cache
+Clean Docker cache:
+```bash
 docker system prune -f
+```
 
-# Rebuild without cache
+Rebuild without cache:
+```bash
 docker build --no-cache -t bedrock-agentcore-itsm-agent .
 ```
 
 ### ECR Push Issues
-```bash
-# Re-authenticate with ECR
-aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-# Verify repository exists
+Re-authenticate with ECR:
+```bash
+aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+```
+
+Verify repository exists:
+```bash
 aws ecr describe-repositories --repository-names $REPO_NAME --region $AWS_REGION
 ```
 
 ### CloudFormation Issues
+
+Check detailed error messages:
 ```bash
-# Check detailed error messages
 aws cloudformation describe-stack-events \
     --stack-name $STACK_NAME \
     --region $AWS_REGION \
@@ -538,21 +612,23 @@ aws cloudformation describe-stack-events \
 
 ## Rollback
 
-To rollback the deployment:
-
+To rollback the deployment, delete CloudFormation stack:
 ```bash
-# Delete CloudFormation stack
 aws cloudformation delete-stack \
     --stack-name $STACK_NAME \
     --region $AWS_REGION
+```
 
-# Clean up ECR repository (optional)
+Clean up ECR repository (optional):
+```bash
 aws ecr delete-repository \
     --repository-name $REPO_NAME \
     --region $AWS_REGION \
     --force
+```
 
-# Clean up local Docker images
+Clean up local Docker images:
+```bash
 docker rmi bedrock-agentcore-itsm-agent:latest $IMAGE_URI
 ```
 
