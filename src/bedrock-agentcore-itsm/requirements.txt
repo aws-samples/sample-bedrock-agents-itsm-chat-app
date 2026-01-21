@@ -13,4 +13,4 @@ urllib3>=2.0.0
 pydantic>=2.0.0
 
 # Logging and configuration
-python-dotenv>=1.0.0
+python-dotenv>=1.0.0strands-agents>=1.0.0

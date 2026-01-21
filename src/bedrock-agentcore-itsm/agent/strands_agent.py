@@ -12,8 +12,7 @@ import os
 from typing import Dict, Any, List, Optional
 
 import boto3
-from strands_agents import Agent, Tool
-from bedrock_agentcore_runtime import agent_handler
+from strands import Agent, Tool
 
 from .tools.create_ticket import CreateTicketTool
 from .tools.lookup_ticket import LookupTicketTool
@@ -24,7 +23,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@agent_handler
 class ITSMAgent(Agent):
     """
     Main ITSM Agent implementation using Strands framework.

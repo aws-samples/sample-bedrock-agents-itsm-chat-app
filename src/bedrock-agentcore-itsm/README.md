@@ -117,28 +117,89 @@ Create a Dockerfile for the AgentCore runtime:
 
 ```bash
 cat > Dockerfile << 'EOF'
-FROM public.ecr.aws/lambda/python:3.11
+# AgentCore requires ARM64 architecture
+FROM --platform=linux/arm64 python:3.11-slim
 
 # Install system dependencies
-RUN yum update -y && yum install -y gcc
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
 
 # Copy requirements and install Python dependencies
-COPY requirements.txt ${LAMBDA_TASK_ROOT}
-RUN pip install -r requirements.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install FastAPI and uvicorn for the web server
+RUN pip install --no-cache-dir fastapi uvicorn[standard]
 
 # Copy agent code
-COPY agent/ ${LAMBDA_TASK_ROOT}/agent/
+COPY agent/ ./agent/
 
-# Set the CMD to your handler
-CMD ["agent.strands_agent.handler"]
+# Create the FastAPI server
+RUN cat > server.py << 'PYEOF'
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import os
+import sys
+
+# Add agent directory to path
+sys.path.insert(0, '/app')
+
+from agent.strands_agent import ITSMAgent
+
+app = FastAPI()
+
+# Initialize the agent
+agent = ITSMAgent(
+    knowledge_base_id=os.environ.get('KNOWLEDGE_BASE_ID'),
+    api_gateway_url=os.environ.get('API_GATEWAY_URL'),
+    region=os.environ.get('AWS_REGION', 'us-east-1')
+)
+
+@app.post("/invocations")
+async def invocations(request: Request):
+    """Handle agent invocations"""
+    try:
+        body = await request.json()
+        prompt = body.get('prompt', '')
+        
+        # Invoke the agent
+        response = await agent.invoke(prompt)
+        
+        return JSONResponse(content={"response": response})
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
+@app.get("/ping")
+async def ping():
+    """Health check endpoint"""
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8080)
+PYEOF
+
+# Expose port 8080
+EXPOSE 8080
+
+# Run the FastAPI server
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
 EOF
 ```
 
 Build the container image:
 
 ```bash
-# Build the container image
-docker build -t bedrock-agentcore-itsm-agent .
+# Build the container image for ARM64 (required by AgentCore)
+docker buildx create --use --name agentcore-builder
+docker buildx build --platform linux/arm64 -t bedrock-agentcore-itsm-agent --load .
 
 # Verify the image was created
 docker images | grep bedrock-agentcore-itsm-agent
@@ -269,28 +330,38 @@ aws bedrock-agentcore-control create-agent-runtime \
     --region $AWS_REGION
 ```
 
-Save the runtime ARN from the output:
+Save the runtime ID from the output:
 
 ```bash
-# Get the runtime ARN from the create command output
-export AGENT_RUNTIME_ARN=<runtime-arn-from-output>
+# Get the runtime ID from the create command output
+export AGENT_RUNTIME_ID=<runtime-id-from-output>
 
 # Or list runtimes to find it
 aws bedrock-agentcore-control list-agent-runtimes --region $AWS_REGION
 ```
 
-Create a runtime endpoint:
+Check if a default endpoint was created:
 
 ```bash
-aws bedrock-agentcore-control create-agent-runtime-endpoint \
-    --agent-runtime-arn $AGENT_RUNTIME_ARN \
-    --endpoint-name bedrock_agentcore_itsm_endpoint \
+aws bedrock-agentcore-control list-agent-runtime-endpoints \
+    --agent-runtime-id $AGENT_RUNTIME_ID \
     --region $AWS_REGION
 ```
 
+If no endpoint exists, create one (optional - a default endpoint is usually created automatically):
+
+```bash
+aws bedrock-agentcore-control create-agent-runtime-endpoint \
+    --agent-runtime-id $AGENT_RUNTIME_ID \
+    --name bedrock_agentcore_itsm_endpoint \
+    --region $AWS_REGION
+```
+
+**Note:** Multiple endpoints can be useful for different environments (dev, staging, prod) or for A/B testing different agent versions.
+
 ### Step 6: Verify Deployment
 
-Get the stack outputs and test the deployment:
+Get the stack outputs:
 
 ```bash
 # Get all stack outputs
@@ -310,24 +381,138 @@ export API_GATEWAY_URL=$(aws cloudformation describe-stacks \
 echo "API Gateway URL: $API_GATEWAY_URL"
 ```
 
-Test the API:
+Test the underlying Lambda functions (optional):
 
 ```bash
-# Test ticket creation
-curl -X POST $API_GATEWAY_URL/create \
-    -H "Content-Type: application/json" \
-    -d '{
-        "tickettype": "INC",
-        "description": "Test ticket from AgentCore deployment",
-        "impact": "Low",
-        "urgency": "Low"
-    }'
+# Test ticket creation Lambda directly
+aws lambda invoke \
+    --function-name $STACK_NAME-ITSM-Create \
+    --payload '{"tickettype":"INC","description":"Test ticket","impact":"Low","urgency":"Low"}' \
+    --region $AWS_REGION \
+    response.json
 
-# Test ticket lookup (use the ticket number from the create response)
-curl -X GET "$API_GATEWAY_URL/lookup?ticketNumber=INC12345678"
+cat response.json
 ```
 
-### Step 7: Deploy Chat Application
+### Step 7: Invoke the AgentCore Agent
+
+Get the agent runtime ARN:
+
+```bash
+# List runtimes to get the ARN
+aws bedrock-agentcore-control list-agent-runtimes --region $AWS_REGION
+
+# Set the runtime ARN
+export AGENT_RUNTIME_ARN=<runtime-arn-from-list>
+```
+
+Invoke the AgentCore agent with natural language:
+
+```bash
+# Create a payload file for ticket creation
+cat > payload.json << 'EOF'
+{
+  "prompt": "Create a high priority incident ticket for a server outage in production"
+}
+EOF
+
+# Invoke the agent
+aws bedrock-agentcore invoke-agent-runtime \
+    --agent-runtime-arn $AGENT_RUNTIME_ARN \
+    --payload file://payload.json \
+    --content-type application/json \
+    --cli-binary-format raw-in-base64-out \
+    --region $AWS_REGION \
+    output.json
+
+cat output.json
+
+# Query the knowledge base
+cat > payload.json << 'EOF'
+{
+  "prompt": "What is the password reset policy?"
+}
+EOF
+
+aws bedrock-agentcore invoke-agent-runtime \
+    --agent-runtime-arn $AGENT_RUNTIME_ARN \
+    --payload file://payload.json \
+    --content-type application/json \
+    --cli-binary-format raw-in-base64-out \
+    --region $AWS_REGION \
+    output.json
+
+cat output.json
+
+# Look up a ticket
+cat > payload.json << 'EOF'
+{
+  "prompt": "Look up ticket INC12345678"
+}
+EOF
+
+aws bedrock-agentcore invoke-agent-runtime \
+    --agent-runtime-arn $AGENT_RUNTIME_ARN \
+    --payload file://payload.json \
+    --content-type application/json \
+    --cli-binary-format raw-in-base64-out \
+    --region $AWS_REGION \
+    output.json
+
+cat output.json
+```
+
+The AgentCore agent will:
+1. Understand your natural language request
+2. Determine which tool to use (create ticket, lookup ticket, or query knowledge base)
+3. Extract the required parameters from your request
+4. Call the appropriate Lambda function via API Gateway
+5. Return a natural language response
+
+**Troubleshooting:** If you get a 404 error, check the CloudWatch logs:
+
+```bash
+# Get the log group name for your runtime
+aws logs describe-log-groups \
+    --log-group-name-prefix /aws/bedrock-agentcore \
+    --region $AWS_REGION
+
+# View recent logs
+aws logs tail /aws/bedrock-agentcore/bedrock_agentcore_itsm_runtime \
+    --follow \
+    --region $AWS_REGION
+```
+
+Common issues:
+- The container must expose `/invocations` POST and `/ping` GET endpoints
+- The container must be built for ARM64 architecture
+- Check that environment variables are set correctly in the runtime
+- Verify the execution role has permissions to invoke Bedrock models and access resources
+
+**Updating the AgentCore Image:**
+
+If you need to update the agent code and redeploy:
+
+```bash
+cd src/bedrock-agentcore-itsm
+
+# Rebuild the image
+docker buildx build --platform linux/arm64 -t bedrock-agentcore-itsm-agent --load .
+
+# Tag and push to ECR
+docker tag bedrock-agentcore-itsm-agent:latest $IMAGE_URI
+docker push $IMAGE_URI
+
+# Update the runtime with the new image
+aws bedrock-agentcore-control update-agent-runtime \
+    --agent-runtime-id $AGENT_RUNTIME_ID \
+    --role-arn $EXECUTION_ROLE_ARN \
+    --agent-runtime-artifact containerConfiguration={containerUri=$IMAGE_URI} \
+    --network-configuration networkMode=PUBLIC \
+    --region $AWS_REGION
+```
+
+### Step 8: Deploy Chat Application
 
 The chat application is shared between both implementations. Navigate to the chat app directory and deploy:
 

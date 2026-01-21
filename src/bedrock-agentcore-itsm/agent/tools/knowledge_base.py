@@ -12,7 +12,7 @@ import os
 from typing import Dict, Any, List, Optional
 
 import boto3
-from strands_agents import Tool
+from strands import Tool
 
 logger = logging.getLogger(__name__)
 
