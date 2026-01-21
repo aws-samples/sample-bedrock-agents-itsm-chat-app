@@ -134,6 +134,8 @@ Navigate to the AgentCore directory:
 cd src/bedrock-agentcore-itsm
 ```
 
+**Note:** The Dockerfile is included in the repository but is in .gitignore to prevent accidental commits of customized versions. If you need to recreate it, use the following command.
+
 Create a Dockerfile for the AgentCore runtime:
 ```bash
 cat > Dockerfile << 'EOF'
@@ -159,7 +161,8 @@ COPY agent_runtime.py .
 EXPOSE 8080
 
 # Run the AgentCore Runtime server
-CMD ["python", "-m", "bedrock_agentcore_runtime", "agent_runtime:app"]
+# The app object is defined in agent_runtime.py
+CMD ["python", "-m", "uvicorn", "agent_runtime:app", "--host", "0.0.0.0", "--port", "8080"]
 EOF
 ```
 
@@ -243,11 +246,10 @@ sam build
 Deploy the CloudFormation stack:
 ```bash
 sam deploy \
-    --template-file template.yml \
     --stack-name $STACK_NAME \
     --capabilities CAPABILITY_NAMED_IAM \
     --region $AWS_REGION \
-    --no-confirm-changeset
+    --resolve-s3
 ```
 
 Monitor the deployment progress. Watch the deployment progress:
