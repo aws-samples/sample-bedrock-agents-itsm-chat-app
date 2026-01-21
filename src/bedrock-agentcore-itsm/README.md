@@ -132,65 +132,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install FastAPI and uvicorn for the web server
-RUN pip install --no-cache-dir fastapi uvicorn[standard]
-
 # Copy agent code
-COPY agent/ ./agent/
-
-# Create the FastAPI server
-RUN cat > server.py << 'PYEOF'
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-import os
-import sys
-
-# Add agent directory to path
-sys.path.insert(0, '/app')
-
-from agent.strands_agent import ITSMAgent
-
-app = FastAPI()
-
-# Initialize the agent
-agent = ITSMAgent(
-    knowledge_base_id=os.environ.get('KNOWLEDGE_BASE_ID'),
-    api_gateway_url=os.environ.get('API_GATEWAY_URL'),
-    region=os.environ.get('AWS_REGION', 'us-east-1')
-)
-
-@app.post("/invocations")
-async def invocations(request: Request):
-    """Handle agent invocations"""
-    try:
-        body = await request.json()
-        prompt = body.get('prompt', '')
-        
-        # Invoke the agent
-        response = await agent.invoke(prompt)
-        
-        return JSONResponse(content={"response": response})
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
-
-@app.get("/ping")
-async def ping():
-    """Health check endpoint"""
-    return {"status": "healthy"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
-PYEOF
+COPY agent_runtime.py .
 
 # Expose port 8080
 EXPOSE 8080
 
-# Run the FastAPI server
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run the AgentCore Runtime server
+CMD ["python", "-m", "bedrock_agentcore_runtime", "agent_runtime:app"]
 EOF
 ```
 
@@ -198,7 +147,9 @@ Build the container image:
 
 ```bash
 # Build the container image for ARM64 (required by AgentCore)
-docker buildx create --use --name agentcore-builder
+# If builder doesn't exist, create it
+docker buildx create --use --name agentcore-builder 2>/dev/null || docker buildx use agentcore-builder
+
 docker buildx build --platform linux/arm64 -t bedrock-agentcore-itsm-agent --load .
 
 # Verify the image was created
@@ -261,7 +212,6 @@ sam deploy \
     --stack-name $STACK_NAME \
     --capabilities CAPABILITY_NAMED_IAM \
     --region $AWS_REGION \
-    --resolve-s3 \
     --no-confirm-changeset
 ```
 
