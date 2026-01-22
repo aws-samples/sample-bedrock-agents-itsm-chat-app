@@ -134,38 +134,6 @@ Navigate to the AgentCore directory:
 cd src/bedrock-agentcore-itsm
 ```
 
-**Note:** The Dockerfile is included in the repository but is in .gitignore to prevent accidental commits of customized versions. If you need to recreate it, use the following command.
-
-Create a Dockerfile for the AgentCore runtime:
-```bash
-cat > Dockerfile << 'EOF'
-# AgentCore requires ARM64 architecture
-FROM --platform=linux/arm64 python:3.11-slim
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
-WORKDIR /app
-
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy agent code
-COPY agent_runtime.py .
-
-# Expose port 8080
-EXPOSE 8080
-
-# Run the AgentCore Runtime server
-# The app object is defined in agent_runtime.py
-CMD ["python", "-m", "uvicorn", "agent_runtime:app", "--host", "0.0.0.0", "--port", "8080"]
-EOF
-```
-
 Build the container image for ARM64 (required by AgentCore). If builder doesn't exist, create it:
 ```bash
 docker buildx create --use --name agentcore-builder 2>/dev/null || docker buildx use agentcore-builder
@@ -270,9 +238,37 @@ aws cloudformation describe-stacks \
     --output text
 ```
 
-### Step 5: Create AgentCore Runtime
+### Step 5: Create AgentCore Memory
 
-**Note:** Bedrock AgentCore requires ARM64 architecture for container images. The AgentCore runtime will be created using the AWS CLI.
+Create a memory resource for conversation persistence.
+
+Install the AgentCore CLI (if not already installed):
+```bash
+pip install bedrock-agentcore
+```
+
+Create a memory resource with strategies:
+```bash
+agentcore memory create \
+    --name ITSMAgentMemory \
+    --description "Memory for ITSM agent conversations" \
+    --strategy summaryMemoryStrategy \
+    --strategy-name SessionSummarizer \
+    --strategy-namespace "/summaries/{actorId}/{sessionId}" \
+    --region $AWS_REGION
+```
+
+Get the memory ID:
+```bash
+export MEMORY_ID=$(agentcore memory list --region $AWS_REGION --query 'memories[?name==`ITSMAgentMemory`].id' --output text)
+```
+
+Display the memory ID:
+```bash
+echo "Memory ID: $MEMORY_ID"
+```
+
+### Step 6: Create AgentCore Runtime
 
 Get the required values from CloudFormation. Get Knowledge Base ID:
 ```bash
@@ -317,7 +313,7 @@ aws bedrock-agentcore-control create-agent-runtime \
     --agent-runtime-artifact containerConfiguration={containerUri=$IMAGE_URI} \
     --network-configuration networkMode=PUBLIC \
     --protocol-configuration serverProtocol=HTTP \
-    --environment-variables KNOWLEDGE_BASE_ID=$KNOWLEDGE_BASE_ID,API_GATEWAY_URL=$API_GATEWAY_URL,AWS_REGION=$AWS_REGION \
+    --environment-variables KNOWLEDGE_BASE_ID=$KNOWLEDGE_BASE_ID,API_GATEWAY_URL=$API_GATEWAY_URL,AWS_REGION=$AWS_REGION,MEMORY_ID=$MEMORY_ID \
     --region $AWS_REGION
 ```
 
@@ -339,55 +335,6 @@ aws bedrock-agentcore-control list-agent-runtime-endpoints \
     --region $AWS_REGION
 ```
 
-If no endpoint exists, create one (optional - a default endpoint is usually created automatically):
-```bash
-aws bedrock-agentcore-control create-agent-runtime-endpoint \
-    --agent-runtime-id $AGENT_RUNTIME_ID \
-    --name bedrock_agentcore_itsm_endpoint \
-    --region $AWS_REGION
-```
-
-**Note:** Multiple endpoints can be useful for different environments (dev, staging, prod) or for A/B testing different agent versions.
-
-### Step 6: Verify Deployment
-
-Get the stack outputs. Get all stack outputs:
-```bash
-aws cloudformation describe-stacks \
-    --stack-name $STACK_NAME \
-    --region $AWS_REGION \
-    --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' \
-    --output table
-```
-
-Get the API Gateway URL:
-```bash
-export API_GATEWAY_URL=$(aws cloudformation describe-stacks \
-    --stack-name $STACK_NAME \
-    --region $AWS_REGION \
-    --query 'Stacks[0].Outputs[?OutputKey==`ApiGatewayUrl`].OutputValue' \
-    --output text)
-```
-
-Display the API Gateway URL:
-```bash
-echo "API Gateway URL: $API_GATEWAY_URL"
-```
-
-Test the underlying Lambda functions (optional). Test ticket creation Lambda directly:
-```bash
-aws lambda invoke \
-    --function-name $STACK_NAME-ITSM-Create \
-    --payload '{"tickettype":"INC","description":"Test ticket","impact":"Low","urgency":"Low"}' \
-    --region $AWS_REGION \
-    response.json
-```
-
-View the response:
-```bash
-cat response.json
-```
-
 ### Step 7: Invoke the AgentCore Agent
 
 Get the agent runtime ARN. List runtimes to get the ARN:
@@ -404,10 +351,13 @@ Invoke the AgentCore agent with natural language. Create a payload file for tick
 ```bash
 cat > payload.json << 'EOF'
 {
-  "prompt": "Create a high priority incident ticket for a server outage in production"
+  "prompt": "Create a high priority incident ticket for a server outage in production",
+  "session_id": "user-123"
 }
 EOF
 ```
+
+**Note:** The `session_id` parameter enables conversation memory. Use the same session_id across multiple requests to maintain context. If omitted, each request will be stateless.
 
 Invoke the agent:
 ```bash
@@ -429,7 +379,8 @@ Query the knowledge base:
 ```bash
 cat > payload.json << 'EOF'
 {
-  "prompt": "What is the password reset policy?"
+  "prompt": "What is the password reset policy?",
+  "session_id": "user-123"
 }
 EOF
 ```
@@ -452,7 +403,8 @@ Look up a ticket:
 ```bash
 cat > payload.json << 'EOF'
 {
-  "prompt": "Look up ticket INC12345678"
+  "prompt": "Look up ticket INC12345678",
+  "session_id": "user-123"
 }
 EOF
 ```
@@ -477,6 +429,58 @@ The AgentCore agent will:
 3. Extract the required parameters from your request
 4. Call the appropriate Lambda function via API Gateway
 5. Return a natural language response
+6. Store conversation context in memory when session_id is provided
+
+**Using Memory for Conversations:**
+
+AgentCore memory allows the agent to maintain context across multiple interactions. To use memory:
+
+1. Include a `session_id` in your payload (e.g., user ID, conversation ID)
+2. Use the same `session_id` for all requests in the same conversation
+3. The agent will remember previous interactions and maintain context
+
+Example conversation with memory:
+```bash
+# First request
+cat > payload.json << 'EOF'
+{
+  "prompt": "I need help with my laptop",
+  "session_id": "user-456"
+}
+EOF
+```
+
+```bash
+aws bedrock-agentcore invoke-agent-runtime \
+    --agent-runtime-arn $AGENT_RUNTIME_ARN \
+    --payload file://payload.json \
+    --content-type application/json \
+    --cli-binary-format raw-in-base64-out \
+    --region $AWS_REGION \
+    output.json
+```
+
+```bash
+# Follow-up request (agent remembers the laptop context)
+cat > payload.json << 'EOF'
+{
+  "prompt": "Create a ticket for it",
+  "session_id": "user-456"
+}
+EOF
+```
+
+```bash
+aws bedrock-agentcore invoke-agent-runtime \
+    --agent-runtime-arn $AGENT_RUNTIME_ARN \
+    --payload file://payload.json \
+    --content-type application/json \
+    --cli-binary-format raw-in-base64-out \
+    --region $AWS_REGION \
+    output.json
+```
+
+The agent will understand "it" refers to the laptop issue from the previous message.
 
 **Troubleshooting:** If you get a 404 error, check the CloudWatch logs.
 
@@ -518,13 +522,14 @@ docker tag bedrock-agentcore-itsm-agent:latest $IMAGE_URI
 docker push $IMAGE_URI
 ```
 
-Update the runtime with the new image:
+Update the runtime with the new image (including MEMORY_ID):
 ```bash
 aws bedrock-agentcore-control update-agent-runtime \
     --agent-runtime-id $AGENT_RUNTIME_ID \
     --role-arn $EXECUTION_ROLE_ARN \
     --agent-runtime-artifact containerConfiguration={containerUri=$IMAGE_URI} \
     --network-configuration networkMode=PUBLIC \
+    --environment-variables KNOWLEDGE_BASE_ID=$KNOWLEDGE_BASE_ID,API_GATEWAY_URL=$API_GATEWAY_URL,AWS_REGION=$AWS_REGION,MEMORY_ID=$MEMORY_ID \
     --region $AWS_REGION
 ```
 

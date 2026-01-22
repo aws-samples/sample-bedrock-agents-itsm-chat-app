@@ -789,6 +789,27 @@ Resources:
                   - !Sub arn:aws:bedrock:*::foundation-model/*
                   - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*
                   - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*
+              # AgentCore Memory access
+              - Sid: AgentCoreMemoryAccess
+                Effect: Allow
+                Action:
+                  - bedrock-agentcore:CreateMemory
+                  - bedrock-agentcore:GetMemory
+                  - bedrock-agentcore:UpdateMemory
+                  - bedrock-agentcore:DeleteMemory
+                  - bedrock-agentcore:ListMemories
+                  - bedrock-agentcore:PutMemoryItem
+                  - bedrock-agentcore:GetMemoryItem
+                  - bedrock-agentcore:DeleteMemoryItem
+                  - bedrock-agentcore:QueryMemory
+                  - bedrock-agentcore:CreateEvent
+                  - bedrock-agentcore:GetEvent
+                  - bedrock-agentcore:ListEvents
+                  - bedrock-agentcore:DeleteEvent
+                  - bedrock-agentcore:RetrieveMemories
+                Resource: 
+                  - !Sub arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:memory/*
+                  - !Sub arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:memory-item/*
               # Knowledge Base access
               - Sid: KnowledgeBaseAccess
                 Effect: Allow

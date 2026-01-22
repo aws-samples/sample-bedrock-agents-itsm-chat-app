@@ -11,6 +11,8 @@ from strands import Agent, tool
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from bedrock_agentcore import BedrockAgentCoreApp
+from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig
+from bedrock_agentcore.memory.integrations.strands.session_manager import AgentCoreMemorySessionManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -23,6 +25,12 @@ app = BedrockAgentCoreApp()
 KNOWLEDGE_BASE_ID = os.environ.get('KNOWLEDGE_BASE_ID')
 API_GATEWAY_URL = os.environ.get('API_GATEWAY_URL')
 AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
+MEMORY_ID = os.environ.get('MEMORY_ID')  # Required: Memory ID created via CLI
+
+if MEMORY_ID:
+    logger.info(f"Memory enabled with ID: {MEMORY_ID}")
+else:
+    logger.warning("No MEMORY_ID provided - agent will run in stateless mode")
 
 
 @tool
@@ -163,11 +171,14 @@ def query_knowledge_base(query: str) -> dict:
         return {"error": f"Failed to query knowledge base: {str(e)}"}
 
 
-# Initialize Strands agent with tools
-agent = Agent(
-    tools=[create_ticket, lookup_ticket, query_knowledge_base],
-    model="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-    system_prompt="""You are an IT Service Management assistant. You help users with:
+# Initialize Strands agent with tools (without session manager - will be created per request)
+def create_agent(session_manager=None):
+    """Create a Strands agent with optional session manager for memory."""
+    return Agent(
+        tools=[create_ticket, lookup_ticket, query_knowledge_base],
+        model="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        session_manager=session_manager,
+        system_prompt="""You are an IT Service Management assistant. You help users with:
 1. Creating IT tickets (incidents for problems, requests for services, changes for modifications)
 2. Looking up existing ticket status
 3. Answering questions about IT policies, procedures, and troubleshooting
@@ -197,36 +208,69 @@ When answering questions:
 - If KB has no information, say so and offer to create a ticket
 
 Be helpful, professional, and conversational."""
-)
+    )
 
 
 @app.entrypoint
 def handle_request(input_data: dict) -> dict:
     """
-    Main entrypoint for AgentCore Runtime.
+    Main entrypoint for AgentCore Runtime with memory support.
     
     Args:
-        input_data: Request data containing the user prompt
+        input_data: Request data containing the user prompt and optional session_id
     
     Returns:
         dict: Agent response
     """
     prompt = input_data.get('prompt', '')
+    session_id = input_data.get('session_id')  # Optional session ID for memory
+    actor_id = input_data.get('actor_id', 'default_user')  # Optional actor ID
     
     if not prompt:
         return {"error": "No prompt provided"}
     
     logger.info(f"Received prompt: {prompt}")
+    if session_id:
+        logger.info(f"Session ID: {session_id}, Actor ID: {actor_id}")
     
     try:
+        # Create agent with or without memory based on session_id
+        if session_id and MEMORY_ID:
+            # Configure memory for this session
+            agentcore_memory_config = AgentCoreMemoryConfig(
+                memory_id=MEMORY_ID,
+                session_id=session_id,
+                actor_id=actor_id
+            )
+            
+            # Create session manager
+            session_manager = AgentCoreMemorySessionManager(
+                agentcore_memory_config=agentcore_memory_config,
+                region_name=AWS_REGION
+            )
+            
+            # Create agent with memory
+            agent = create_agent(session_manager=session_manager)
+            logger.info("Agent created with memory enabled")
+        else:
+            # Create agent without memory (stateless)
+            agent = create_agent()
+            logger.info("Agent created without memory (stateless)")
+        
         # Invoke the Strands agent
         result = agent(prompt)
         
         logger.info("Agent response received")
         
-        return {
+        response = {
             "message": result.message
         }
+        
+        # Include session_id in response if provided
+        if session_id:
+            response["session_id"] = session_id
+        
+        return response
     except Exception as e:
         logger.error(f"Agent invocation failed: {str(e)}")
         return {"error": f"Failed to process request: {str(e)}"}
