@@ -6,12 +6,11 @@ This directory contains the Bedrock AgentCore implementation of the ITSM chat so
 
 The AgentCore implementation provides:
 
-* **Production-Ready Architecture**: Enterprise-grade deployment with full control over agent behavior
+* **Container-Based Deployment**: Modern containerized deployment using Amazon Bedrock AgentCore
 * **Custom Agent Logic**: Complete control using Python and the Strands framework
-* **Container-Based Deployment**: Modern containerized deployment patterns for production environments
 * **Framework Flexibility**: Use any Python AI framework (LangChain, LangGraph, Strands, etc.)
 * **Advanced Debugging**: Direct access to agent code for debugging and monitoring
-* **Enterprise Security**: Compliance-ready with custom security controls
+* **Enterprise-Grade**: Built on AgentCore, designed for production workloads with enterprise customization and control
 
 ## Architecture
 
@@ -91,7 +90,7 @@ aws sts get-caller-identity --profile myprofile
 
 ## Deployment Process
 
-The AgentCore deployment is designed for production environments. You'll execute each step to understand and control the container-based AI agent deployment process.
+The AgentCore deployment demonstrates container-based AI agent deployment. You'll execute each step to understand the deployment process.
 
 ### Step 1: Environment Validation
 
@@ -611,7 +610,7 @@ aws cloudformation describe-stacks \
 
 Access the chat application at the CloudFront URL. You'll need to create a Cognito user to log in.
 
-## Understanding the Components
+### Understanding the Components
 
 ### Agent Implementation (`agent_runtime.py`)
 The main agent implementation using the Strands framework that orchestrates tool usage and handles user requests with memory support.
@@ -696,22 +695,22 @@ docker rmi bedrock-agentcore-itsm-agent:latest $IMAGE_URI
 
 By completing this deployment, you'll gain:
 
-* Production-ready container-based AI agent deployment experience
-* ECR repository management and Docker workflows for enterprise environments
-* CloudFormation parameter management for production deployments
-* AWS service integration and enterprise IAM permission management
+* Container-based AI agent deployment experience with Amazon Bedrock AgentCore
+* ECR repository management and Docker workflows
+* CloudFormation parameter management
+* AWS service integration and IAM permission management
 * Debugging and monitoring capabilities for containerized applications
-* Infrastructure as Code best practices for production systems
+* Infrastructure as Code best practices
 
 ## Next Steps
 
 After successful deployment:
 
-1. **Explore the Code**: Examine the production-ready agent and tool implementations
-2. **Customize the Agent**: Modify the agent logic for your enterprise use cases
-3. **Add New Tools**: Extend the agent with additional enterprise capabilities
-4. **Monitor Performance**: Set up production-grade CloudWatch dashboards and alarms
-5. **Security Review**: Review IAM permissions and implement enterprise security configurations
-6. **Scale for Production**: Configure auto-scaling and high-availability settings
+1. **Explore the Code**: Examine the agent and tool implementations
+2. **Customize the Agent**: Modify the agent logic for your use cases
+3. **Add New Tools**: Extend the agent with additional capabilities
+4. **Monitor Performance**: Set up CloudWatch dashboards and alarms
+5. **Security Review**: Review IAM permissions and implement security best practices
+6. **Scale for Production**: Configure auto-scaling and high-availability settings for production workloads
 
-This production-focused approach provides the foundation for building enterprise-ready AI applications with full control and customization capabilities.
+This approach provides the foundation for building AI applications with AgentCore's enterprise-grade platform.
