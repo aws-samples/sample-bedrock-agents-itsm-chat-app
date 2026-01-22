@@ -69,9 +69,10 @@ async function handleBedrockAgentCore(inputText, sessionId) {
     throw new Error('AGENTCORE_ENDPOINT environment variable is required for bedrock-agentcore implementation');
   }
 
+  // AgentCore expects 'prompt' and 'session_id' (with underscore)
   const requestBody = JSON.stringify({
-    inputText: inputText,
-    sessionId: sessionId
+    prompt: inputText,
+    session_id: sessionId
   });
 
   const options = {
@@ -94,8 +95,8 @@ async function handleBedrockAgentCore(inputText, sessionId) {
         try {
           const response = JSON.parse(data);
           resolve({
-            sessionId: sessionId,
-            response: response.response || response.message || 'No response received'
+            sessionId: response.session_id || sessionId,
+            response: response.message || response.response || 'No response received'
           });
         } catch (error) {
           console.error('Error parsing AgentCore response:', error);

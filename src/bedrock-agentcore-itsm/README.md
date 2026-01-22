@@ -240,28 +240,19 @@ aws cloudformation describe-stacks \
 
 ### Step 5: Create AgentCore Memory
 
-Create a memory resource for conversation persistence.
-
-Install the AgentCore CLI (if not already installed):
+Create a memory resource for conversation persistence using the AWS CLI:
 ```bash
-pip install bedrock-agentcore
+aws bedrock-agentcore-control list-memories --region $AWS_REGION
 ```
 
-Create a memory resource with strategies:
+If you don't have a memory resource yet, you can create one using the AgentCore SDK in Python or via the AWS Console. For this demo, we'll use an existing memory or create one programmatically.
+
+Get the memory ID (if ITSMAgentMemory exists):
 ```bash
-agentcore memory create \
-    --name ITSMAgentMemory \
-    --description "Memory for ITSM agent conversations" \
-    --strategy summaryMemoryStrategy \
-    --strategy-name SessionSummarizer \
-    --strategy-namespace "/summaries/{actorId}/{sessionId}" \
-    --region $AWS_REGION
+export MEMORY_ID=$(aws bedrock-agentcore-control list-memories --region $AWS_REGION --query 'memories[?starts_with(id, `ITSMAgentMemory`)].id | [0]' --output text)
 ```
 
-Get the memory ID:
-```bash
-export MEMORY_ID=$(agentcore memory list --region $AWS_REGION --query 'memories[?name==`ITSMAgentMemory`].id' --output text)
-```
+If no memory exists, the agent will run in stateless mode. To create a memory resource, use the AWS Console or SDK.
 
 Display the memory ID:
 ```bash
@@ -336,16 +327,6 @@ aws bedrock-agentcore-control list-agent-runtime-endpoints \
 ```
 
 ### Step 7: Invoke the AgentCore Agent
-
-Get the agent runtime ARN. List runtimes to get the ARN:
-```bash
-aws bedrock-agentcore-control list-agent-runtimes --region $AWS_REGION
-```
-
-Set the runtime ARN (replace with actual value from output):
-```bash
-export AGENT_RUNTIME_ARN=<runtime-arn-from-list>
-```
 
 Invoke the AgentCore agent with natural language. Create a payload file for ticket creation:
 ```bash
@@ -561,19 +542,20 @@ aws s3 cp web/ s3://$WEB_BUCKET/ --recursive
 
 ## Understanding the Components
 
-### Agent Implementation (`agent/strands_agent.py`)
-The main agent class that orchestrates tool usage and handles user requests using the Strands framework.
+### Agent Implementation (`agent_runtime.py`)
+The main agent implementation using the Strands framework that orchestrates tool usage and handles user requests with memory support.
 
-### Tools (`agent/tools/`)
-* **create_ticket.py**: Handles ticket creation requests
-* **lookup_ticket.py**: Handles ticket lookup requests  
-* **knowledge_base.py**: Handles knowledge base queries
+### Tools
+Defined as Python functions with the `@tool` decorator:
+* **create_ticket**: Handles ticket creation requests with IAM-authenticated API calls
+* **lookup_ticket**: Handles ticket lookup requests
+* **query_knowledge_base**: Queries the Bedrock Knowledge Base for IT policies and procedures
 
 ### Shared Functions (`functions/`)
-Lambda functions that provide the same ITSM API as the Bedrock Agents implementation, ensuring data compatibility.
+Lambda functions that provide the ITSM API backend, shared with the Bedrock Agents implementation for data compatibility.
 
 ### Infrastructure (`template.yml`)
-CloudFormation template that defines the AgentCore runtime, shared resources, and IAM permissions.
+CloudFormation template that defines the AgentCore execution role, shared resources (DynamoDB, S3, OpenSearch, Knowledge Base), and IAM permissions.
 
 ## Troubleshooting
 
