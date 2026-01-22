@@ -77,7 +77,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - bedrock-agentcore:InvokeAgent
+                  - bedrock-agentcore:InvokeAgentRuntime
                   - execute-api:Invoke
                 Resource: '*'
                 
@@ -137,9 +137,16 @@ Resources:
         RequestTemplates:
           application/json: |
             #set($inputRoot = $input.path('$'))
+            #set($authHeader = $input.params().header.get('Authorization'))
+            #if($authHeader.startsWith("Bearer "))
+              #set($token = $authHeader.substring(7))
+            #else
+              #set($token = $authHeader)
+            #end
             {
               "inputText": $input.json('$.message'),
-              "sessionId": $input.json('$.sessionId')
+              "sessionId": $input.json('$.sessionId'),
+              "token": "$token"
             }
         IntegrationResponses:
           - StatusCode: 200

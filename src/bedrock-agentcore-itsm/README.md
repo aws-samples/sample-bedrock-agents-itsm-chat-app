@@ -516,17 +516,36 @@ aws bedrock-agentcore-control update-agent-runtime \
 
 ### Step 8: Deploy Chat Application
 
-The chat application is shared between both implementations. Navigate to the chat app directory and deploy:
+The chat application is shared between both implementations and supports both Bedrock Agents and AgentCore backends.
+
+Navigate to the chat app directory:
 ```bash
 cd ../chat-app
 ```
 
+Build the application:
 ```bash
 sam build
-sam deploy --guided --capabilities CAPABILITY_NAMED_IAM
 ```
 
-Upload the web files. Get the S3 bucket name from CloudFormation outputs:
+For AgentCore deployment, use the runtime ARN (already set in Step 6):
+```bash
+echo "AgentCore Runtime ARN: $AGENT_RUNTIME_ARN"
+```
+
+Deploy with AgentCore configuration:
+```bash
+sam deploy \
+    --stack-name bedrock-agent-chat-app \
+    --capabilities CAPABILITY_NAMED_IAM \
+    --region $AWS_REGION \
+    --parameter-overrides \
+        ImplementationType=bedrock-agentcore \
+        AgentCoreEndpoint=$AGENT_RUNTIME_ARN \
+    --resolve-s3
+```
+
+Get the S3 bucket name from CloudFormation outputs:
 ```bash
 export WEB_BUCKET=$(aws cloudformation describe-stacks \
     --stack-name bedrock-agent-chat-app \
@@ -539,6 +558,17 @@ Upload web files:
 ```bash
 aws s3 cp web/ s3://$WEB_BUCKET/ --recursive
 ```
+
+Get the CloudFront URL:
+```bash
+aws cloudformation describe-stacks \
+    --stack-name bedrock-agent-chat-app \
+    --region $AWS_REGION \
+    --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontDomain`].OutputValue' \
+    --output text
+```
+
+Access the chat application at the CloudFront URL. You'll need to create a Cognito user to log in.
 
 ## Understanding the Components
 

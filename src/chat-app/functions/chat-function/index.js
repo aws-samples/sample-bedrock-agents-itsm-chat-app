@@ -5,19 +5,51 @@ const { randomUUID } = require('crypto');
 exports.handler = async (event) => {
   console.log('Event received:', JSON.stringify(event));
 
-  try {
-    var sessionId = event['sessionId'];
-    if (sessionId == "default") {
-      sessionId = generateSessionId();
-    }
-  } catch (error) {
-    sessionId = generateSessionId();
+  // Decode the JWT token to extract cognito:username
+  const token = event.token;
+  
+  if (!token) {
+    console.error('No token found in event');
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ error: 'Unauthorized - No token provided' })
+    };
   }
 
-  var inputText = event['inputText'];
+  let cognitoUserId;
+  try {
+    // JWT tokens have 3 parts separated by dots: header.payload.signature
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error('Invalid token format');
+    }
+    
+    // Decode the payload (second part)
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+    
+    // Extract cognito:username from the payload
+    cognitoUserId = payload['cognito:username'];
+    
+    if (!cognitoUserId) {
+      throw new Error('cognito:username not found in token');
+    }
+    
+    console.log('Cognito User ID:', cognitoUserId);
+  } catch (error) {
+    console.error('Error decoding token:', error.message);
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ error: 'Unauthorized - Invalid token' })
+    };
+  }
+
+  // Use Cognito user ID as session ID (it's already 36 characters - UUID format)
+  const sessionId = cognitoUserId;
+  const inputText = event['inputText'];
   const implementationType = process.env.IMPLEMENTATION_TYPE;
 
   console.log('Implementation type:', implementationType);
+  console.log('Session ID:', sessionId);
 
   if (implementationType === 'bedrock-agents') {
     return await handleBedrockAgents(inputText, sessionId);
@@ -62,63 +94,94 @@ async function handleBedrockAgents(inputText, sessionId) {
 }
 
 async function handleBedrockAgentCore(inputText, sessionId) {
-  const https = require('https');
-  const agentCoreEndpoint = process.env.AGENTCORE_ENDPOINT;
+  const { BedrockAgentCoreClient, InvokeAgentRuntimeCommand } = require("@aws-sdk/client-bedrock-agentcore");
+  const { randomUUID } = require('crypto');
   
-  if (!agentCoreEndpoint) {
+  const agentRuntimeArn = process.env.AGENTCORE_ENDPOINT;
+  
+  if (!agentRuntimeArn) {
     throw new Error('AGENTCORE_ENDPOINT environment variable is required for bedrock-agentcore implementation');
   }
 
-  // AgentCore expects 'prompt' and 'session_id' (with underscore)
-  const requestBody = JSON.stringify({
+  const client = new BedrockAgentCoreClient({ region: process.env.AWS_REGION });
+
+  // Generate a valid session ID (must be at least 33 characters)
+  const runtimeSessionId = sessionId && sessionId.length >= 33 
+    ? sessionId 
+    : `session-${randomUUID()}-${Date.now()}`;
+
+  // Prepare the payload
+  const payload = JSON.stringify({
     prompt: inputText,
-    session_id: sessionId
+    session_id: runtimeSessionId
   });
 
-  const options = {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(requestBody)
-    }
-  };
+  const command = new InvokeAgentRuntimeCommand({
+    agentRuntimeArn: agentRuntimeArn,
+    runtimeSessionId: runtimeSessionId,
+    payload: Buffer.from(payload)
+  });
 
-  return new Promise((resolve, reject) => {
-    const req = https.request(agentCoreEndpoint, options, (res) => {
-      let data = '';
+  try {
+    const response = await client.send(command);
+    
+    console.log('Response metadata:', response.$metadata);
+    console.log('Response contentType:', response.contentType);
+    
+    // The response field contains the streaming data
+    if (response.response) {
+      console.log('Found response field');
+      let fullResponse = '';
       
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      
-      res.on('end', () => {
-        try {
-          const response = JSON.parse(data);
-          resolve({
-            sessionId: response.session_id || sessionId,
-            response: response.message || response.response || 'No response received'
-          });
-        } catch (error) {
-          console.error('Error parsing AgentCore response:', error);
-          resolve({
-            sessionId: sessionId,
-            response: 'Error processing request'
-          });
+      // Iterate over the response stream
+      for await (const chunk of response.response) {
+        if (chunk) {
+          const part = new TextDecoder().decode(chunk);
+          fullResponse += part;
+          console.log('Chunk received:', part);
         }
-      });
-    });
-
-    req.on('error', (error) => {
-      console.error('Error calling AgentCore:', error);
-      resolve({
-        sessionId: sessionId,
-        response: 'Error connecting to agent service'
-      });
-    });
-
-    req.write(requestBody);
-    req.end();
-  });
+      }
+      
+      if (fullResponse) {
+        console.log('Full response:', fullResponse);
+        // Parse the response
+        try {
+          const responseBody = JSON.parse(fullResponse);
+          // Extract text from the message structure
+          let responseText = fullResponse;
+          if (responseBody.message && responseBody.message.content && responseBody.message.content[0]) {
+            responseText = responseBody.message.content[0].text;
+          } else if (responseBody.message) {
+            responseText = responseBody.message;
+          } else if (responseBody.response) {
+            responseText = responseBody.response;
+          }
+          
+          return {
+            sessionId: responseBody.session_id || runtimeSessionId,
+            response: responseText
+          };
+        } catch {
+          return {
+            sessionId: runtimeSessionId,
+            response: fullResponse
+          };
+        }
+      }
+    }
+    
+    console.log('No response field found');
+    return {
+      sessionId: runtimeSessionId,
+      response: 'No response received from agent'
+    };
+  } catch (error) {
+    console.error('Error calling AgentCore:', error.message);
+    return {
+      sessionId: runtimeSessionId,
+      response: `Error: ${error.message}`
+    };
+  }
 }
 
 function generateSessionId() {

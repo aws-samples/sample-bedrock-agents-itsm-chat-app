@@ -1,0 +1,10 @@
+{
+  "name": "chat-function",
+  "version": "1.0.0",
+  "description": "Chat Lambda function supporting both Bedrock Agents and AgentCore",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.0.0",
+    "@aws-sdk/client-bedrock-agentcore": "^3.0.0"
+  }
+}

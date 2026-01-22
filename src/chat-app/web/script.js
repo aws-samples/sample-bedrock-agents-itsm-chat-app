@@ -36,16 +36,8 @@ closeBtn.addEventListener('click', () => {
 
 // Send message function
 async function sendMessage() {
-
-    try
-    {
-         var token = getCookieValue("token");
-         var sessionId = getCookieValue("sessionId");
-    }
-    catch (err)     
-    {
-        console.log(err.toString());
-    }
+    var token = getCookieValue("token");
+    var sessionId = getCookieValue("sessionId");
 
     const message = messageInput.value.trim();
     if (!message) return;
@@ -71,12 +63,8 @@ async function sendMessage() {
                         'sessionId': sessionId
                     }),
                     success: function (data) {
-
-                        console.log(JSON.stringify(data));
-
                         document.cookie = `sessionId=${data.sessionId}; path=/; secure; samesite=strict`;
                         
-                        // Remove loading indicator
                         loadingElement.remove();
                         
                         // Display bot response
@@ -85,12 +73,9 @@ async function sendMessage() {
                 });
 
     } catch (error) {
-        console.error('Error:', error);
         
-        // Remove loading indicator
         loadingElement.remove();
         
-        // Display error message
         addMessage('Sorry, there was an error processing your message.', 'bot');
     }
 }
@@ -107,7 +92,6 @@ function addMessage(text, sender, isLoading = false) {
     messageDiv.textContent = text;
     chatMessages.appendChild(messageDiv);
     
-    // Scroll to bottom
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
     return messageDiv;
@@ -124,8 +108,6 @@ function getToken(auth, success, error) {
             success(data);
         },
         error: function (x, s, e) {
-            //failure(e);
-            console.log(e.toString());
         },
     });
 }
@@ -168,34 +150,17 @@ function getParameterByName(name, url) {
 
 
 $().ready(function () {
-
-    var token = '';
-    try
-    {
-        token = getCookieValue("token");
-    }
-    catch {
-
-    }
+    var token = getCookieValue("token");
 
     if (token == '' || isTokenExpired(token)) {
-        var auth = '';
-        try {
-            auth = getParameterByName('code');
-        }
-        catch (err) {
-            auth = '';
-        }
+        var auth = getParameterByName('code');
         var loginUrl = COGNITO_DOMAIN + '/login?redirect_uri=' + REDIRECT_URI + '&response_type=code&client_id=' + COGNITO_APP_CLIENT_ID;
         if (auth === null) {
             window.location.replace(loginUrl);
         }
         else {
-            var auth = '0';
-            auth = getParameterByName('code');
-            var tokenData = getToken(auth,
+            getToken(auth,
                 function (data) {
-
                     var token = data.id_token;
                     var accessToken = data.access_token;
                     
