@@ -97,8 +97,7 @@ function addMessage(text, sender, isLoading = false) {
     return messageDiv;
 }
 
-function getToken(auth, success, error) {
-
+function getToken(auth, success) {
     $.ajax({
         url: COGNITO_DOMAIN + '/oauth2/token',
         type: 'POST',
@@ -106,9 +105,7 @@ function getToken(auth, success, error) {
         data: { "grant_type": "authorization_code", "client_id": COGNITO_APP_CLIENT_ID, "code": auth, "redirect_uri": REDIRECT_URI },
         success: function (data) {
             success(data);
-        },
-        error: function (x, s, e) {
-        },
+        }
     });
 }
 

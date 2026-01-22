@@ -46,13 +46,62 @@ After the deployment completes, note the outputs from the CloudFormation stack, 
 
 ### Step 2: Upload PDF Documents and Sync Knowledge Base
 
-1. Upload the PDF documents from the **docs** folder to the S3 bucket created by the template:
+After the deployment completes, note the outputs from the CloudFormation stack. You'll need the Knowledge Base ID and S3 bucket name.
 
+Get the Knowledge Base S3 bucket name:
 ```bash
-aws s3 cp docs/ s3://<your-knowledge-base-bucket-name>/ --recursive --exclude "*" --include "*.pdf"
+export STACK_NAME=bedrock-agents-itsm
+export AWS_REGION=us-east-1
+export KB_BUCKET=$(aws cloudformation describe-stacks \
+    --stack-name $STACK_NAME \
+    --region $AWS_REGION \
+    --query 'Stacks[0].Outputs[?OutputKey==`KnowledgeBaseS3Bucket`].OutputValue' \
+    --output text)
+echo "Knowledge Base S3 Bucket: $KB_BUCKET"
 ```
 
-2. Navigate to the Amazon Bedrock console, go to Knowledge bases, select the knowledge base created by the template, and click on "Sync" to update the data source with the newly uploaded documents.
+Get the Knowledge Base ID:
+```bash
+export KNOWLEDGE_BASE_ID=$(aws cloudformation describe-stacks \
+    --stack-name $STACK_NAME \
+    --region $AWS_REGION \
+    --query 'Stacks[0].Outputs[?OutputKey==`KnowledgeBaseId`].OutputValue' \
+    --output text)
+echo "Knowledge Base ID: $KNOWLEDGE_BASE_ID"
+```
+
+Upload the PDF document from the docs folder to the S3 bucket:
+```bash
+aws s3 cp ../../docs/Fictitious-Company-Employee-IT-Handbook.pdf s3://$KB_BUCKET/
+```
+
+Sync the Knowledge Base to index the uploaded document:
+```bash
+aws bedrock-agent start-ingestion-job \
+    --knowledge-base-id $KNOWLEDGE_BASE_ID \
+    --data-source-id $(aws bedrock-agent list-data-sources \
+        --knowledge-base-id $KNOWLEDGE_BASE_ID \
+        --region $AWS_REGION \
+        --query 'dataSourceSummaries[0].dataSourceId' \
+        --output text) \
+    --region $AWS_REGION
+```
+
+Wait for the ingestion job to complete (this may take a few minutes):
+```bash
+aws bedrock-agent list-ingestion-jobs \
+    --knowledge-base-id $KNOWLEDGE_BASE_ID \
+    --data-source-id $(aws bedrock-agent list-data-sources \
+        --knowledge-base-id $KNOWLEDGE_BASE_ID \
+        --region $AWS_REGION \
+        --query 'dataSourceSummaries[0].dataSourceId' \
+        --output text) \
+    --region $AWS_REGION \
+    --query 'ingestionJobSummaries[0].status' \
+    --output text
+```
+
+The status should change from `IN_PROGRESS` to `COMPLETE`. Once complete, the Knowledge Base is ready to answer questions about IT policies and procedures.
 
 ### Step 3: Deploy the Chat Application
 

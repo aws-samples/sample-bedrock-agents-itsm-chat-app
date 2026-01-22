@@ -238,6 +238,47 @@ aws cloudformation describe-stacks \
     --output text
 ```
 
+Get the Knowledge Base S3 bucket name:
+```bash
+export KB_BUCKET=$(aws cloudformation describe-stacks \
+    --stack-name $STACK_NAME \
+    --region $AWS_REGION \
+    --query 'Stacks[0].Outputs[?OutputKey==`KnowledgeBaseS3Bucket`].OutputValue' \
+    --output text)
+echo "Knowledge Base S3 Bucket: $KB_BUCKET"
+```
+
+Upload the PDF document to the Knowledge Base S3 bucket:
+```bash
+aws s3 cp ../../docs/Fictitious-Company-Employee-IT-Handbook.pdf s3://$KB_BUCKET/
+```
+
+Sync the Knowledge Base to index the uploaded document:
+```bash
+aws bedrock-agent start-ingestion-job \
+    --knowledge-base-id $KNOWLEDGE_BASE_ID \
+    --data-source-id $(aws bedrock-agent list-data-sources \
+        --knowledge-base-id $KNOWLEDGE_BASE_ID \
+        --region $AWS_REGION \
+        --query 'dataSourceSummaries[0].dataSourceId' \
+        --output text) \
+    --region $AWS_REGION
+```
+
+Wait for the ingestion job to complete (this may take a few minutes):
+```bash
+aws bedrock-agent list-ingestion-jobs \
+    --knowledge-base-id $KNOWLEDGE_BASE_ID \
+    --data-source-id $(aws bedrock-agent list-data-sources \
+        --knowledge-base-id $KNOWLEDGE_BASE_ID \
+        --region $AWS_REGION \
+        --query 'dataSourceSummaries[0].dataSourceId' \
+        --output text) \
+    --region $AWS_REGION \
+    --query 'ingestionJobSummaries[0].status' \
+    --output text
+```
+
 ### Step 5: Create AgentCore Memory
 
 Create a memory resource for conversation persistence using the AWS CLI:
