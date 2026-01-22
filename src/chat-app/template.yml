@@ -3,6 +3,24 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: 'Chat application with Lambda, API Gateway, CloudFront, and Cognito'
 
+Parameters:
+  ImplementationType:
+    Type: String
+    Default: bedrock-agents
+    AllowedValues:
+      - bedrock-agents
+      - bedrock-agentcore
+    Description: Choose which backend implementation to use (bedrock-agents or bedrock-agentcore)
+  
+  AgentCoreEndpoint:
+    Type: String
+    Default: ""
+    Description: AgentCore Runtime endpoint URL (required only when ImplementationType is bedrock-agentcore)
+
+Conditions:
+  UseBedrockAgents: !Equals [!Ref ImplementationType, bedrock-agents]
+  UseBedrockAgentCore: !Equals [!Ref ImplementationType, bedrock-agentcore]
+
 Resources:
   # Lambda Function
   ChatLambdaFunction:
@@ -15,10 +33,19 @@ Resources:
       CodeUri: functions/chat-function/
       Environment:
         Variables:
-          agentId:
-            Fn::ImportValue: "ITSMBedrockAgentId"
-          agentAliasId:
-            Fn::ImportValue: "ITSMBedrockAgentAliasId"
+          IMPLEMENTATION_TYPE: !Ref ImplementationType
+          agentId: !If 
+            - UseBedrockAgents
+            - !ImportValue "ITSMBedrockAgentId"
+            - !Ref "AWS::NoValue"
+          agentAliasId: !If
+            - UseBedrockAgents
+            - !ImportValue "ITSMBedrockAgentAliasId"
+            - !Ref "AWS::NoValue"
+          AGENTCORE_ENDPOINT: !If
+            - UseBedrockAgentCore
+            - !Ref AgentCoreEndpoint
+            - !Ref "AWS::NoValue"
       Timeout: 30
       MemorySize: 256
 
@@ -43,6 +70,15 @@ Resources:
               - Effect: Allow
                 Action:
                   - bedrock:InvokeAgent
+                Resource: '*'
+        - PolicyName: BedrockAgentCoreAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock-agentcore:InvokeAgentRuntime
+                  - execute-api:Invoke
                 Resource: '*'
                 
   # Config Generator Lambda Role
@@ -101,9 +137,16 @@ Resources:
         RequestTemplates:
           application/json: |
             #set($inputRoot = $input.path('$'))
+            #set($authHeader = $input.params().header.get('Authorization'))
+            #if($authHeader.startsWith("Bearer "))
+              #set($token = $authHeader.substring(7))
+            #else
+              #set($token = $authHeader)
+            #end
             {
               "inputText": $input.json('$.message'),
-              "sessionId": $input.json('$.sessionId')
+              "sessionId": $input.json('$.sessionId'),
+              "token": "$token"
             }
         IntegrationResponses:
           - StatusCode: 200
