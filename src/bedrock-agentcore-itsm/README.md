@@ -280,24 +280,30 @@ aws bedrock-agent list-ingestion-jobs \
 
 ### Step 5: Create AgentCore Memory
 
-Create a memory resource for conversation persistence using the AWS CLI:
+Create a memory resource for conversation persistence.
+
+Create the memory:
 ```bash
-aws bedrock-agentcore-control list-memories --region $AWS_REGION
+aws bedrock-agentcore-control create-memory \
+    --name ITSMAgentMemory \
+    --description "Memory for ITSM Agent conversations" \
+    --region $AWS_REGION
 ```
 
-If you don't have a memory resource yet, you can create one using the AgentCore SDK in Python or via the AWS Console. For this demo, we'll use an existing memory or create one programmatically.
-
-Get the memory ID (if ITSMAgentMemory exists):
+Get the memory ID from the output:
 ```bash
-export MEMORY_ID=$(aws bedrock-agentcore-control list-memories --region $AWS_REGION --query 'memories[?starts_with(id, `ITSMAgentMemory`)].id | [0]' --output text)
+export MEMORY_ID=$(aws bedrock-agentcore-control list-memories \
+    --region $AWS_REGION \
+    --query 'memories[?starts_with(id, `ITSMAgentMemory`)].id | [0]' \
+    --output text)
 ```
-
-If no memory exists, the agent will run in stateless mode. To create a memory resource, use the AWS Console or SDK.
 
 Display the memory ID:
 ```bash
 echo "Memory ID: $MEMORY_ID"
 ```
+
+If you prefer to run without memory (stateless mode), you can skip this step and leave MEMORY_ID empty.
 
 ### Step 6: Create AgentCore Runtime
 
